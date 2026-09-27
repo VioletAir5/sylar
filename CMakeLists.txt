@@ -14,3 +14,8 @@ add_subdirectory(sylar)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+option(SYLAR_BUILD_BENCHMARKS "Build standalone logging benchmarks" OFF)
+if(SYLAR_BUILD_BENCHMARKS)
+    add_subdirectory(bench)
+endif()
