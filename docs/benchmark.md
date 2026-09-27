@@ -4,7 +4,7 @@
 
 ## 构建与运行
 
-在本项目根目录执行：
+先准备 [yaml-cpp 依赖](configuration.md#依赖与构建)，再在本项目根目录执行：
 
 ```sh
 git clone https://github.com/gabime/spdlog.git ../spdlog-upstream
