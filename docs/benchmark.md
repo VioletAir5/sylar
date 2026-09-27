@@ -1,40 +1,46 @@
 # 日志性能测试
 
-场景参考 [spdlog 的 bench.cpp](https://github.com/gabime/spdlog/blob/v1.x/bench/bench.cpp)（MIT 许可），测试程序为本项目重新实现。它测试当前同步 Logger，不链接 spdlog，也不把结果当作两库之间的直接对比。
+场景参考 [spdlog 的 bench.cpp](https://github.com/gabime/spdlog/blob/v1.x/bench/bench.cpp)（MIT 许可）。本项目提供两个独立程序：`sylar_log_bench` 测当前同步 Logger，`spdlog_log_bench` 测真正的 spdlog。后者使用 spdlog 自带的 fmt；spdlog 源码放在本项目目录外。
 
 ## 构建与运行
 
-    cmake -S . -B build-bench -DCMAKE_BUILD_TYPE=Release \
-      -DSYLAR_BUILD_BENCHMARKS=ON -DBUILD_TESTING=OFF
-    cmake --build build-bench -j
-    ./build-bench/bench/sylar_log_bench 250000 4
+在本项目根目录执行：
 
-位置参数依次是每个场景的消息总数、线程数、可选日志目录。默认分别为 250000、4 和 /tmp 下的唯一目录。普通构建默认不包含 benchmark 目标。
+```sh
+git clone https://github.com/gabime/spdlog.git ../spdlog-upstream
+git -C ../spdlog-upstream checkout 5b6378033725c89d30a694473e90a806d3bb5780
+cmake -S . -B build-bench -DCMAKE_BUILD_TYPE=Release \
+  -DSYLAR_BUILD_BENCHMARKS=ON -DBUILD_TESTING=OFF \
+  -DSYLAR_SPDLOG_SOURCE_DIR="$PWD/../spdlog-upstream"
+cmake --build build-bench -j
+./build-bench/bench/sylar_log_bench 250000 4
+./build-bench/bench/spdlog_log_bench 250000 4
+```
+
+`SYLAR_SPDLOG_SOURCE_DIR` 是可选的；不设置时仅构建本项目的测试。位置参数为每场景的消息总数、线程数和可选的日志目录；默认分别是 250000、4 和 `/tmp` 下的唯一目录。重复运行时使用新目录，因为两份程序的文件 Sink 都以追加模式打开文件。普通构建默认不包含 benchmark 目标。
 
 ## 场景和口径
 
 | 场景 | 内容 |
 | --- | --- |
-| file/single | 当前线程写入一个 FileSink |
-| file/1-thread | 新建一个线程写入同一个 FileSink |
-| file/N-thread | N 个线程并发写入同一个 FileSink |
+| file/single | 当前线程写入带锁文件 Sink |
+| file/1-thread | 新建一个线程写入同一个 Sink |
+| file/N-thread | N 个线程并发写入同一个 Sink |
 | level-off/single | 当前线程调用关闭级别的 Logger |
 | level-off/N-thread | N 个线程调用关闭级别的 Logger |
 
-每个写文件场景生成一个独立文件。程序从第一条日志开始计时；线程场景把创建和 join 线程的时间算入日志耗时。写入结束后显式 flush，并单独报告 flush 时间。消息总数会在各线程间分配完整，不丢弃余数。
+两份程序使用相同的 `message {index}` 消息、日期/名称/级别/消息格式、消息总数和线程分配。每个写文件场景生成一个独立文件。计时包含日志调用；线程场景还包含创建与 join。结束后显式 flush，其耗时另列。写文件结果包括格式化、锁和缓冲写入，不包括 `fsync`。两库的文件 Sink 实现不同，因此结果衡量各自完整的同步写文件路径。level-off 场景短至微秒级，易受编译器优化和调度影响，不宜据此判断过滤快路径优劣。
 
-写文件结果包含格式化、互斥锁和写入 C++ 缓冲流的时间，不包含 fsync 或磁盘持久化时间。关闭级别的结果只反映过滤快路径。不同机器、文件系统和编译选项的数字不可直接比较；本项目没有 spdlog 的单线程无锁 Sink、旋转文件或每日文件 Sink，所以未移植对应场景。
+## 本机对比
 
-## 本机基线
+2026-09-27，WSL Ubuntu，GCC 13.1，Release，spdlog 1.17.0（提交 `5b6378033725`），每场景 250000 条，4 线程。交错运行两套程序各三轮，下表是吞吐中位数：
 
-2026-09-27，WSL Ubuntu，GCC 13.1，Release，250000 条/场景，4 线程：
+| 场景 | 当前实现（条/秒） | spdlog（条/秒） | spdlog / 当前实现 |
+| --- | ---: | ---: | ---: |
+| file/single | 1,139,148 | 5,866,279 | 5.15× |
+| file/1-thread | 1,193,415 | 5,358,393 | 4.49× |
+| file/N-thread | 323,282 | 2,209,964 | 6.84× |
+| level-off/single | 902,761,729 | 142,854,776 | 0.16× |
+| level-off/N-thread | 621,963,264 | 231,546,014 | 0.37× |
 
-| 场景 | 日志时间 | 吞吐（条/秒） |
-| --- | ---: | ---: |
-| file/single | 0.181828 s | 1,374,927 |
-| file/1-thread | 0.192173 s | 1,300,913 |
-| file/N-thread | 0.756068 s | 330,658 |
-| level-off/single | 0.000287 s | 871,341,238 |
-| level-off/N-thread | 0.000327 s | 764,881,535 |
-
-写文件的三个输出各核对为 250000 行。这些数值是一次测量的基线，不代表稳定性能承诺。
+每轮的三个写文件输出均核对为各 250000 行。这些数字只代表本机测试；文件系统、编译选项和负载会影响结果。
