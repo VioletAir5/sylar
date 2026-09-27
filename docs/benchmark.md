@@ -1,23 +1,21 @@
 # 日志性能测试
 
-场景参考 [spdlog 的 bench.cpp](https://github.com/gabime/spdlog/blob/v1.x/bench/bench.cpp)（MIT 许可）。本项目提供两个独立程序：`sylar_log_bench` 测当前同步 Logger，`spdlog_log_bench` 测真正的 spdlog。后者使用 spdlog 自带的 fmt；spdlog 源码放在本项目目录外。
+场景参考 [spdlog 的 bench.cpp](https://github.com/gabime/spdlog/blob/v1.x/bench/bench.cpp)（MIT 许可）。本项目提供两个独立程序：`sylar_log_bench` 测当前同步 Logger，`spdlog_log_bench` 测系统安装的 spdlog。两者以相同场景运行。
 
 ## 构建与运行
 
-先准备 [yaml-cpp 依赖](configuration.md#依赖与构建)，再在本项目根目录执行：
+Ubuntu 需要 `libspdlog-dev` 和 yaml-cpp 开发包。yaml-cpp 的安装方式见[配置系统说明](configuration.md#依赖与构建)。在本项目根目录执行：
 
 ```sh
-git clone https://github.com/gabime/spdlog.git ../spdlog-upstream
-git -C ../spdlog-upstream checkout 5b6378033725c89d30a694473e90a806d3bb5780
 cmake -S . -B build-bench -DCMAKE_BUILD_TYPE=Release \
-  -DSYLAR_BUILD_BENCHMARKS=ON -DBUILD_TESTING=OFF \
-  -DSYLAR_SPDLOG_SOURCE_DIR="$PWD/../spdlog-upstream"
+  -DSYLAR_BUILD_BENCHMARKS=ON -DSYLAR_BENCH_WITH_SPDLOG=ON \
+  -DBUILD_TESTING=OFF
 cmake --build build-bench -j
 ./build-bench/bench/sylar_log_bench 250000 4
 ./build-bench/bench/spdlog_log_bench 250000 4
 ```
 
-`SYLAR_SPDLOG_SOURCE_DIR` 是可选的；不设置时仅构建本项目的测试。位置参数为每场景的消息总数、线程数和可选的日志目录；默认分别是 250000、4 和 `/tmp` 下的唯一目录。重复运行时使用新目录，因为两份程序的文件 Sink 都以追加模式打开文件。普通构建默认不包含 benchmark 目标。
+如果 yaml-cpp 安装在自定义前缀，配置时再传入 `-DCMAKE_PREFIX_PATH=/path/to/yaml-cpp/prefix`。不启用 `SYLAR_BENCH_WITH_SPDLOG` 时，只构建本项目的 benchmark。位置参数为每场景的消息总数、线程数和可选的日志目录；默认分别是 250000、4 和 `/tmp` 下的唯一目录。重复运行时使用新目录，因为两份程序的文件 Sink 都以追加模式打开文件。普通构建默认不包含 benchmark 目标。
 
 ## 场景和口径
 
@@ -33,14 +31,14 @@ cmake --build build-bench -j
 
 ## 本机对比
 
-2026-09-27，WSL Ubuntu，GCC 13.1，Release，spdlog 1.17.0（提交 `5b6378033725`），每场景 250000 条，4 线程。交错运行两套程序各三轮，下表是吞吐中位数：
+2026-09-27，WSL Ubuntu，GCC 13.1，Release，系统包 spdlog 1.9.2，每场景 250000 条，4 线程。交错运行两套程序各三轮，下表是吞吐中位数：
 
 | 场景 | 当前实现（条/秒） | spdlog（条/秒） | spdlog / 当前实现 |
 | --- | ---: | ---: | ---: |
-| file/single | 1,139,148 | 5,866,279 | 5.15× |
-| file/1-thread | 1,193,415 | 5,358,393 | 4.49× |
-| file/N-thread | 323,282 | 2,209,964 | 6.84× |
-| level-off/single | 902,761,729 | 142,854,776 | 0.16× |
-| level-off/N-thread | 621,963,264 | 231,546,014 | 0.37× |
+| file/single | 1,258,677 | 5,822,415 | 4.63× |
+| file/1-thread | 1,263,747 | 5,816,509 | 4.60× |
+| file/N-thread | 330,610 | 2,004,275 | 6.06× |
+| level-off/single | 916,378,618 | 143,572,050 | 0.16× |
+| level-off/N-thread | 590,357,804 | 552,615,640 | 0.94× |
 
 每轮的三个写文件输出均核对为各 250000 行。这些数字只代表本机测试；文件系统、编译选项和负载会影响结果。

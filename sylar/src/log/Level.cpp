@@ -34,7 +34,8 @@ std::optional<LogLevel> parseLevel(std::string_view name) noexcept
         LogLevel::WARN,
         LogLevel::ERROR,
         LogLevel::FATAL,
-        LogLevel::OFF};
+        LogLevel::OFF
+    };
 
     for (const auto level : levels)
     {
