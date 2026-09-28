@@ -4,6 +4,7 @@
 import argparse
 import os
 import re
+import select
 import socket
 import subprocess
 import time
@@ -16,7 +17,8 @@ def free_port():
 
 
 def server_cpu(pid):
-    stat = open(f"/proc/{pid}/stat", encoding="ascii").read()
+    with open(f"/proc/{pid}/stat", encoding="ascii") as stream:
+        stat = stream.read()
     fields = stat[stat.rfind(")") + 2 :].split()
     return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
 
@@ -38,6 +40,9 @@ def run_case(args, workers):
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     try:
+        readable, _, _ = select.select([server.stdout], [], [], 5)
+        if not readable:
+            raise RuntimeError("server did not report readiness")
         ready = server.stdout.readline()
         if str(port) not in ready:
             raise RuntimeError(f"server did not start: {ready!r}")

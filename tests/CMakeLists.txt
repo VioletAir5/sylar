@@ -16,3 +16,12 @@ if(SYLAR_TEST_SOURCES)
         gtest_discover_tests("${test_name}")
     endforeach()
 endif()
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(
+    NAME EchoApp.ConfigIdleAndShutdown
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_echo_app.py"
+        $<TARGET_FILE:echo_server>
+)
+set_tests_properties(EchoApp.ConfigIdleAndShutdown PROPERTIES TIMEOUT 5)

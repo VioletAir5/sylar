@@ -27,12 +27,88 @@ using namespace std::chrono_literals;
 namespace
 {
 
+class IdleDeadline final
+    : public std::enable_shared_from_this<IdleDeadline>
+{
+public:
+    IdleDeadline(
+        sylar::IOManager& io,
+        int fd,
+        std::chrono::milliseconds timeout
+    )
+        : m_io(io)
+        , m_fd(fd)
+        , m_timeout(timeout)
+        , m_lastActivity(Clock::now())
+    {
+    }
+
+    ~IdleDeadline()
+    {
+        if (m_timer != 0)
+        {
+            m_io.cancelTimer(m_timer);
+        }
+    }
+
+    void start()
+    {
+        arm(m_timeout);
+    }
+
+    void touch() noexcept
+    {
+        m_lastActivity = Clock::now();
+    }
+
+private:
+    using Clock = std::chrono::steady_clock;
+
+    void arm(std::chrono::milliseconds delay)
+    {
+        std::weak_ptr<IdleDeadline> weak = shared_from_this();
+        m_timer = m_io.addTimer(
+            delay,
+            [weak]
+            {
+                if (auto deadline = weak.lock())
+                {
+                    deadline->check();
+                }
+            }
+        );
+    }
+
+    void check()
+    {
+        m_timer = 0;
+        const auto elapsed = Clock::now() - m_lastActivity;
+        if (elapsed >= m_timeout)
+        {
+            m_io.cancel(m_fd, sylar::IOManager::Event::Read);
+            m_io.cancel(m_fd, sylar::IOManager::Event::Write);
+            return;
+        }
+        arm(std::chrono::ceil<std::chrono::milliseconds>(
+            m_timeout - elapsed
+        ));
+    }
+
+    sylar::IOManager& m_io;
+    int m_fd;
+    std::chrono::milliseconds m_timeout;
+    Clock::time_point m_lastActivity;
+    sylar::TimerManager::TimerId m_timer = 0;
+};
+
 void echoSession(
     sylar::IOManager& io,
     int fd,
     std::chrono::milliseconds idle_timeout
 )
 {
+    auto idle = std::make_shared<IdleDeadline>(io, fd, idle_timeout);
+    idle->start();
     std::array<char, 8192> buffer{};
     for (;;)
     {
@@ -52,7 +128,7 @@ void echoSession(
             {
                 return;
             }
-            if (io.waitReadable(fd, idle_timeout) !=
+            if (io.waitReadable(fd) !=
                 sylar::IOManager::WaitResult::Ready)
             {
                 return;
@@ -60,6 +136,7 @@ void echoSession(
             continue;
         }
 
+        idle->touch();
         ssize_t offset = 0;
         while (offset < count)
         {
@@ -72,6 +149,7 @@ void echoSession(
             if (sent > 0)
             {
                 offset += sent;
+                idle->touch();
                 continue;
             }
             if (sent < 0 && errno == EINTR)
@@ -80,7 +158,7 @@ void echoSession(
             }
             if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
             {
-                if (io.waitWritable(fd, idle_timeout) ==
+                if (io.waitWritable(fd) ==
                     sylar::IOManager::WaitResult::Ready)
                 {
                     continue;

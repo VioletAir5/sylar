@@ -112,8 +112,8 @@ private:
     void cancelAllWaits();
 
     std::thread::id m_ownerThread;
-    Scheduler m_scheduler;
     TimerManager m_timers;
+    Scheduler m_scheduler;
     int m_epollFd = -1;
     int m_wakeupFd = -1;
     std::mutex m_postMutex;
