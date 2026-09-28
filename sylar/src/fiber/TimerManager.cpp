@@ -66,6 +66,13 @@ bool TimerManager::cancel(TimerId id)
     return true;
 }
 
+void TimerManager::clear()
+{
+    requireOwnerThread();
+    m_byId.clear();
+    m_timers.clear();
+}
+
 std::optional<std::chrono::milliseconds>
 TimerManager::nextTimeout() const
 {

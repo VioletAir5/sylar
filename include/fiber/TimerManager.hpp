@@ -27,6 +27,7 @@ public:
         std::function<void()> callback
     );
     bool cancel(TimerId id);
+    void clear();
     std::optional<std::chrono::milliseconds> nextTimeout() const;
     std::vector<std::function<void()>> takeExpired();
     bool empty() const;

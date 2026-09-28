@@ -2,6 +2,7 @@
 
 #include <fcntl.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <unistd.h>
 
 #include <array>
@@ -10,6 +11,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 namespace sylar
 {
@@ -26,10 +28,40 @@ IOManager::IOManager()
             "epoll_create1"
         );
     }
+    m_wakeupFd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (m_wakeupFd < 0)
+    {
+        const int error = errno;
+        ::close(m_epollFd);
+        throw std::system_error(
+            error,
+            std::generic_category(),
+            "eventfd"
+        );
+    }
+    epoll_event wakeup{};
+    wakeup.events = EPOLLIN;
+    wakeup.data.fd = m_wakeupFd;
+    if (::epoll_ctl(m_epollFd, EPOLL_CTL_ADD, m_wakeupFd, &wakeup) !=
+        0)
+    {
+        const int error = errno;
+        ::close(m_wakeupFd);
+        ::close(m_epollFd);
+        throw std::system_error(
+            error,
+            std::generic_category(),
+            "epoll_ctl(eventfd)"
+        );
+    }
 }
 
 IOManager::~IOManager()
 {
+    if (m_wakeupFd >= 0)
+    {
+        ::close(m_wakeupFd);
+    }
     if (m_epollFd >= 0)
     {
         ::close(m_epollFd);
@@ -184,6 +216,10 @@ IOManager::WaitResult IOManager::wait(
         throw std::invalid_argument("negative I/O timeout");
     }
 
+    if (m_stopRequested.load())
+    {
+        return WaitResult::Cancelled;
+    }
     auto state = std::make_shared<WaitState>();
     registerWait(fd, event, state);
     TimerManager::TimerId timer_id = 0;
@@ -380,6 +416,15 @@ void IOManager::waitForEvents()
 
     for (int index = 0; index < count; ++index)
     {
+        if (events[index].data.fd == m_wakeupFd)
+        {
+            std::uint64_t counter;
+            while (::read(m_wakeupFd, &counter, sizeof(counter)) ==
+                   sizeof(counter))
+            {
+            }
+            continue;
+        }
         const auto flags = events[index].events;
         std::uint32_t completed = 0;
         if (flags &
@@ -395,11 +440,108 @@ void IOManager::waitForEvents()
     }
 }
 
+void IOManager::signalWakeup()
+{
+    const std::uint64_t one = 1;
+    if (::write(m_wakeupFd, &one, sizeof(one)) < 0 && errno != EAGAIN)
+    {
+        throw std::system_error(
+            errno,
+            std::generic_category(),
+            "eventfd write"
+        );
+    }
+}
+
+void IOManager::post(std::function<void()> callback)
+{
+    if (!callback)
+    {
+        throw std::invalid_argument("empty posted task");
+    }
+    {
+        std::lock_guard lock(m_postMutex);
+        if (m_stopRequested.load())
+        {
+            throw std::logic_error("IOManager is stopping");
+        }
+        m_posts.push_back(std::move(callback));
+    }
+    signalWakeup();
+}
+
+void IOManager::requestStop()
+{
+    {
+        std::lock_guard lock(m_postMutex);
+        m_stopRequested.store(true);
+    }
+    signalWakeup();
+}
+
+void IOManager::drainPosts()
+{
+    std::deque<std::function<void()>> pending;
+    {
+        std::lock_guard lock(m_postMutex);
+        pending.swap(m_posts);
+    }
+    for (auto& callback : pending)
+    {
+        m_scheduler.schedule(std::move(callback));
+    }
+}
+
+void IOManager::cancelAllWaits()
+{
+    std::vector<int> fds;
+    fds.reserve(m_waiters.size());
+    for (const auto& [fd, context] : m_waiters)
+    {
+        (void)context;
+        fds.push_back(fd);
+    }
+    for (int fd : fds)
+    {
+        finish(fd, EPOLLIN | EPOLLOUT, WaitResult::Cancelled);
+    }
+}
+
+void IOManager::runForever()
+{
+    requireOwnerThread();
+    for (;;)
+    {
+        drainPosts();
+        m_scheduler.run();
+        if (m_stopRequested.load())
+        {
+            // A producer may have posted just before requestStop().
+            drainPosts();
+            m_scheduler.run();
+            cancelAllWaits();
+            m_timers.clear();
+            m_scheduler.run();
+            return;
+        }
+        for (auto& callback : m_timers.takeExpired())
+        {
+            m_scheduler.schedule(std::move(callback));
+        }
+        if (m_scheduler.readyCount() != 0)
+        {
+            continue;
+        }
+        waitForEvents();
+    }
+}
+
 void IOManager::run()
 {
     requireOwnerThread();
     for (;;)
     {
+        drainPosts();
         m_scheduler.run();
         for (auto& callback : m_timers.takeExpired())
         {

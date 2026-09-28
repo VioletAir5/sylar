@@ -1,10 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <thread>
 #include <unordered_map>
@@ -61,6 +64,10 @@ public:
     void sleepFor(std::chrono::milliseconds delay);
 
     bool cancel(int fd, Event event);
+    // Thread-safe submission and stop signal for runForever().
+    void post(std::function<void()> callback);
+    void requestStop();
+    void runForever();
     void run();
     std::size_t pendingEventCount() const;
 
@@ -100,11 +107,18 @@ private:
     );
     bool finish(int fd, std::uint32_t event_mask, WaitResult result);
     void waitForEvents();
+    void signalWakeup();
+    void drainPosts();
+    void cancelAllWaits();
 
     std::thread::id m_ownerThread;
     Scheduler m_scheduler;
     TimerManager m_timers;
     int m_epollFd = -1;
+    int m_wakeupFd = -1;
+    std::mutex m_postMutex;
+    std::deque<std::function<void()>> m_posts;
+    std::atomic<bool> m_stopRequested{false};
     std::unordered_map<int, FdContext> m_waiters;
     std::size_t m_pendingEvents = 0;
 };
