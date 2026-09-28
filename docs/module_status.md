@@ -10,7 +10,7 @@
 | Fiber | 已实现 | Boost.Context 有栈 Fiber |
 | 协程调度 | 部分 | 每工作线程独立 Scheduler；不提供跨线程迁移 Fiber |
 | I/O 协程调度 | 已实现 | epoll、eventfd、定时器、取消和超时 |
-| Hook | 未实现 | 当前通过显式 SocketStream 和 IOManager 等待实现非阻塞 I/O |
+| Hook | 部分 | 可选 POSIX socket 读写、连接、接受连接与睡眠拦截；调用范围见 [Hook](hook.md) |
 | Socket | 部分 | IPv4、IPv6、Unix 地址及 RAII Socket；仍需扩展 Socket API |
 | ByteArray | 已实现 | 固定宽度、Varint、字符串、文件读写 |
 | TcpServer | 部分 | 单地址监听、多线程分派；仍需多地址绑定 |

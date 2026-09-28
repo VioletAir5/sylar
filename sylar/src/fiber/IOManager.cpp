@@ -15,6 +15,30 @@
 
 namespace sylar
 {
+namespace
+{
+
+thread_local IOManager* current_io = nullptr;
+
+class CurrentIoGuard
+{
+public:
+    explicit CurrentIoGuard(IOManager* io)
+        : m_previous(current_io)
+    {
+        current_io = io;
+    }
+
+    ~CurrentIoGuard()
+    {
+        current_io = m_previous;
+    }
+
+private:
+    IOManager* m_previous;
+};
+
+} // namespace
 
 IOManager::IOManager()
     : m_ownerThread(std::this_thread::get_id())
@@ -510,6 +534,7 @@ void IOManager::cancelAllWaits()
 void IOManager::runForever()
 {
     requireOwnerThread();
+    CurrentIoGuard guard(this);
     for (;;)
     {
         drainPosts();
@@ -539,6 +564,7 @@ void IOManager::runForever()
 void IOManager::run()
 {
     requireOwnerThread();
+    CurrentIoGuard guard(this);
     for (;;)
     {
         drainPosts();
@@ -557,6 +583,11 @@ void IOManager::run()
         }
         waitForEvents();
     }
+}
+
+IOManager* IOManager::GetThis() noexcept
+{
+    return current_io;
 }
 
 std::size_t IOManager::pendingEventCount() const

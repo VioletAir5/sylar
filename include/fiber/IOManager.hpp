@@ -70,6 +70,7 @@ public:
     void runForever();
     void run();
     std::size_t pendingEventCount() const;
+    static IOManager* GetThis() noexcept;
 
 private:
     struct WaitState
