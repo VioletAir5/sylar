@@ -1,5 +1,6 @@
 find_package(fmt CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
+find_package(Boost CONFIG REQUIRED COMPONENTS context)
 
 # Reconfigure when a source file is added, so new modules need no CMake edit.
 file(GLOB_RECURSE SYLAR_SOURCES CONFIGURE_DEPENDS
@@ -11,7 +12,7 @@ file(GLOB_RECURSE SYLAR_SOURCES CONFIGURE_DEPENDS
 if(SYLAR_SOURCES)
     add_library(sylar_core STATIC ${SYLAR_SOURCES})
     target_include_directories(sylar_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
-    target_link_libraries(sylar_core PUBLIC fmt::fmt yaml-cpp)
+    target_link_libraries(sylar_core PUBLIC fmt::fmt yaml-cpp Boost::context)
     target_compile_options(sylar_core PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
     )
@@ -19,7 +20,7 @@ else()
     # The repository can configure before the first implementation file exists.
     add_library(sylar_core INTERFACE)
     target_include_directories(sylar_core INTERFACE "${PROJECT_SOURCE_DIR}/include")
-    target_link_libraries(sylar_core INTERFACE fmt::fmt yaml-cpp)
+    target_link_libraries(sylar_core INTERFACE fmt::fmt yaml-cpp Boost::context)
 endif()
 
 file(GLOB SYLAR_APPS CONFIGURE_DEPENDS
