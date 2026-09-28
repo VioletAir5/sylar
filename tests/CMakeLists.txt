@@ -61,3 +61,11 @@ add_test(
         $<TARGET_FILE:sqlite_demo>
 )
 set_tests_properties(SqliteApp.PersistsAcrossProcesses PROPERTIES TIMEOUT 10)
+
+add_test(
+    NAME SmtpApp.PlainTlsAndReject
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_smtp_app.py"
+        $<TARGET_FILE:smtp_demo>
+)
+set_tests_properties(SmtpApp.PlainTlsAndReject PROPERTIES TIMEOUT 20)
