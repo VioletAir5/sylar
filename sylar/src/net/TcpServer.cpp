@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 namespace sylar
 {
@@ -33,6 +34,29 @@ struct OwnedFd
     OwnedFd(const OwnedFd&) = delete;
     OwnedFd& operator=(const OwnedFd&) = delete;
 
+    OwnedFd(OwnedFd&& other) noexcept
+        : fd(std::exchange(other.fd, -1))
+    {
+    }
+
+    OwnedFd& operator=(OwnedFd&& other) noexcept
+    {
+        if (this != &other)
+        {
+            close();
+            fd = std::exchange(other.fd, -1);
+        }
+        return *this;
+    }
+
+    void close() noexcept
+    {
+        if (fd >= 0)
+        {
+            ::close(std::exchange(fd, -1));
+        }
+    }
+
     int fd;
 };
 
@@ -54,7 +78,8 @@ struct TcpServer::State
     IOManager& io;
     IOManagerPool* workers;
     Handler handler;
-    int listener = -1;
+    std::vector<OwnedFd> listeners;
+    std::vector<Address> addresses;
     std::uint16_t port = 0;
     bool running = false;
     bool started = false;
@@ -93,101 +118,125 @@ void TcpServer::start(const std::string& ipv4, std::uint16_t port)
     start(Address::ipv4(ipv4, port));
 }
 
-void TcpServer::start(const Address& bind_address)
+void TcpServer::start(const Address& address)
+{
+    start(std::vector<Address>{address});
+}
+
+void TcpServer::start(const std::vector<Address>& bind_addresses)
 {
     auto& state = *m_state;
     if (state.started)
     {
         throw std::logic_error("TcpServer cannot restart");
     }
-
-    OwnedFd listener(::socket(
-        bind_address.family(),
-        SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
-        0
-    ));
-    if (listener.fd < 0)
+    if (bind_addresses.empty())
     {
-        throw std::system_error(
-            errno,
-            std::generic_category(),
-            "socket"
+        throw std::invalid_argument(
+            "TcpServer needs at least one address"
         );
     }
-    if (bind_address.family() != AF_UNIX)
+
+    std::vector<OwnedFd> listeners;
+    std::vector<Address> actual_addresses;
+    listeners.reserve(bind_addresses.size());
+    actual_addresses.reserve(bind_addresses.size());
+    for (const auto& bind_address : bind_addresses)
     {
-        const int reuse = 1;
-        if (::setsockopt(
+        OwnedFd listener(::socket(
+            bind_address.family(),
+            SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+            0
+        ));
+        if (listener.fd < 0)
+        {
+            throw std::system_error(
+                errno,
+                std::generic_category(),
+                "socket"
+            );
+        }
+        if (bind_address.family() != AF_UNIX)
+        {
+            const int reuse = 1;
+            if (::setsockopt(
+                    listener.fd,
+                    SOL_SOCKET,
+                    SO_REUSEADDR,
+                    &reuse,
+                    sizeof(reuse)
+                ) != 0)
+            {
+                throw std::system_error(
+                    errno,
+                    std::generic_category(),
+                    "setsockopt"
+                );
+            }
+        }
+        if (::bind(
                 listener.fd,
-                SOL_SOCKET,
-                SO_REUSEADDR,
-                &reuse,
-                sizeof(reuse)
+                bind_address.data(),
+                bind_address.size()
             ) != 0)
         {
             throw std::system_error(
                 errno,
                 std::generic_category(),
-                "setsockopt"
+                "bind"
             );
         }
-    }
-    if (::bind(
-            listener.fd,
-            bind_address.data(),
-            bind_address.size()
-        ) != 0)
-    {
-        throw std::system_error(
-            errno,
-            std::generic_category(),
-            "bind"
+        if (::listen(listener.fd, SOMAXCONN) != 0)
+        {
+            throw std::system_error(
+                errno,
+                std::generic_category(),
+                "listen"
+            );
+        }
+        sockaddr_storage actual{};
+        socklen_t length = sizeof(actual);
+        if (::getsockname(
+                listener.fd,
+                reinterpret_cast<sockaddr*>(&actual),
+                &length
+            ) != 0)
+        {
+            throw std::system_error(
+                errno,
+                std::generic_category(),
+                "getsockname"
+            );
+        }
+        actual_addresses.emplace_back(
+            reinterpret_cast<const sockaddr*>(&actual),
+            length
         );
-    }
-    if (::listen(listener.fd, SOMAXCONN) != 0)
-    {
-        throw std::system_error(
-            errno,
-            std::generic_category(),
-            "listen"
-        );
-    }
-    sockaddr_storage actual{};
-    socklen_t length = sizeof(actual);
-    if (::getsockname(
-            listener.fd,
-            reinterpret_cast<sockaddr*>(&actual),
-            &length
-        ) != 0)
-    {
-        throw std::system_error(
-            errno,
-            std::generic_category(),
-            "getsockname"
-        );
+        listeners.push_back(std::move(listener));
     }
 
-    state.listener = listener.fd;
-    state.port = actual.ss_family == AF_UNIX
+    state.port = actual_addresses.front().family() == AF_UNIX
                      ? 0
-                     : Address(
-                           reinterpret_cast<const sockaddr*>(&actual),
-                           length
-                       )
-                           .port();
+                     : actual_addresses.front().port();
+    state.listeners = std::move(listeners);
+    state.addresses = std::move(actual_addresses);
     state.running = true;
     try
     {
-        state.io.schedule([shared = m_state] { acceptLoop(shared); });
+        for (const auto& listener : state.listeners)
+        {
+            state.io.schedule([shared = m_state, fd = listener.fd]
+                              { acceptLoop(shared, fd); });
+        }
     }
     catch (...)
     {
         state.running = false;
-        state.listener = -1;
+        state.listeners.clear();
+        state.addresses.clear();
         state.port = 0;
         throw;
     }
-    listener.fd = -1;
     state.started = true;
 }
 
@@ -199,9 +248,13 @@ void TcpServer::stop()
         return;
     }
     state.running = false;
-    state.io.cancel(state.listener, IOManager::Event::Read);
-    ::close(state.listener);
-    state.listener = -1;
+    for (auto& listener : state.listeners)
+    {
+        state.io.cancel(listener.fd, IOManager::Event::Read);
+        listener.close();
+    }
+    state.listeners.clear();
+    state.addresses.clear();
     state.port = 0;
 }
 
@@ -210,17 +263,24 @@ std::uint16_t TcpServer::localPort() const
     return m_state->port;
 }
 
+std::vector<Address> TcpServer::localAddresses() const
+{
+    return m_state->addresses;
+}
+
 bool TcpServer::running() const
 {
     return m_state->running;
 }
 
-void TcpServer::acceptLoop(const std::shared_ptr<State>& state)
+void TcpServer::acceptLoop(
+    const std::shared_ptr<State>& state, int listener
+)
 {
     while (state->running)
     {
         const int fd = ::accept4(
-            state->listener,
+            listener,
             nullptr,
             nullptr,
             SOCK_NONBLOCK | SOCK_CLOEXEC
@@ -259,8 +319,7 @@ void TcpServer::acceptLoop(const std::shared_ptr<State>& state)
         }
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
-            const auto result = state->io.waitReadable(state->listener
-            );
+            const auto result = state->io.waitReadable(listener);
             if (result == IOManager::WaitResult::Cancelled &&
                 !state->running)
             {

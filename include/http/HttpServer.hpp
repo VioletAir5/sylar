@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "net/TcpServer.hpp"
 
@@ -27,8 +28,10 @@ public:
 
     void start(const std::string& ipv4, std::uint16_t port);
     void start(const Address& address);
+    void start(const std::vector<Address>& addresses);
     void stop();
     std::uint16_t localPort() const;
+    std::vector<Address> localAddresses() const;
 
 private:
     TcpServer m_tcp;

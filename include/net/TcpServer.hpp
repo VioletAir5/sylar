@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "net/Address.hpp"
 
@@ -35,13 +36,16 @@ public:
     // A stopped instance cannot be restarted.
     void start(const std::string& ipv4, std::uint16_t port);
     void start(const Address& address);
+    void start(const std::vector<Address>& addresses);
     void stop();
     std::uint16_t localPort() const;
+    std::vector<Address> localAddresses() const;
     bool running() const;
 
 private:
     struct State;
-    static void acceptLoop(const std::shared_ptr<State>& state);
+    static void
+    acceptLoop(const std::shared_ptr<State>& state, int listener);
 
     std::shared_ptr<State> m_state;
 };

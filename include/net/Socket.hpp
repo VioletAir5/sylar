@@ -19,6 +19,7 @@ class Socket
 {
 public:
     static Socket tcp(int family = AF_INET);
+    static Socket udp(int family = AF_INET);
     static Socket adopt(int fd);
     static Socket borrow(int fd);
 
@@ -45,6 +46,16 @@ public:
     void setNoDelay(bool enabled = true);
     ssize_t recvSome(std::span<std::byte> buffer);
     ssize_t sendSome(std::span<const std::byte> buffer);
+    ssize_t sendTo(
+        std::span<const std::byte> buffer, const Address& destination
+    );
+
+    struct Datagram
+    {
+        ssize_t count;
+        Address source;
+    };
+    std::optional<Datagram> recvFrom(std::span<std::byte> buffer);
 
 private:
     explicit Socket(int fd, bool owned = true) noexcept;

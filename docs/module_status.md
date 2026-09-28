@@ -11,9 +11,9 @@
 | 协程调度 | 部分 | 每工作线程独立 Scheduler；不提供跨线程迁移 Fiber |
 | I/O 协程调度 | 已实现 | epoll、eventfd、定时器、取消和超时 |
 | Hook | 部分 | 可选 POSIX socket 读写、连接、接受连接与睡眠拦截；调用范围见 [Hook](hook.md) |
-| Socket | 部分 | IPv4、IPv6、Unix 地址及 RAII Socket；仍需扩展 Socket API |
+| Socket | 已实现 | IPv4、IPv6、Unix 地址，TCP/UDP RAII Socket，选项与地址查询 |
 | ByteArray | 已实现 | 固定宽度、Varint、字符串、文件读写 |
-| TcpServer | 部分 | 单地址监听、多线程分派；仍需多地址绑定 |
+| TcpServer | 已实现 | 多地址监听、多线程分派、统一停机 |
 | Stream | 已实现 | Stream 与 SocketStream |
 | HTTP | 部分 | HTTP/1.1 服务端、客户端、keep-alive、chunked；仍需完善协议边界与性能 |
 | Servlet | 已实现 | 精确和前缀路由、FunctionServlet、404 回退 |

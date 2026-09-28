@@ -108,6 +108,11 @@ void HttpServer::start(const Address& address)
     m_tcp.start(address);
 }
 
+void HttpServer::start(const std::vector<Address>& addresses)
+{
+    m_tcp.start(addresses);
+}
+
 void HttpServer::stop()
 {
     m_tcp.stop();
@@ -116,6 +121,11 @@ void HttpServer::stop()
 std::uint16_t HttpServer::localPort() const
 {
     return m_tcp.localPort();
+}
+
+std::vector<Address> HttpServer::localAddresses() const
+{
+    return m_tcp.localAddresses();
 }
 
 } // namespace sylar

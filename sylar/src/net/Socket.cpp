@@ -62,6 +62,24 @@ Socket Socket::tcp(int family)
     return Socket(fd);
 }
 
+Socket Socket::udp(int family)
+{
+    const int fd = ::socket(
+        family,
+        SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+        0
+    );
+    if (fd < 0)
+    {
+        throw std::system_error(
+            errno,
+            std::generic_category(),
+            "socket"
+        );
+    }
+    return Socket(fd);
+}
+
 Socket Socket::adopt(int fd)
 {
     if (fd < 0)
@@ -308,6 +326,52 @@ ssize_t Socket::sendSome(std::span<const std::byte> buffer)
 {
     checkFd(m_fd);
     return ::send(m_fd, buffer.data(), buffer.size(), MSG_NOSIGNAL);
+}
+
+ssize_t Socket::sendTo(
+    std::span<const std::byte> buffer, const Address& destination
+)
+{
+    checkFd(m_fd);
+    return ::sendto(
+        m_fd,
+        buffer.data(),
+        buffer.size(),
+        MSG_NOSIGNAL,
+        destination.data(),
+        destination.size()
+    );
+}
+
+std::optional<Socket::Datagram>
+Socket::recvFrom(std::span<std::byte> buffer)
+{
+    checkFd(m_fd);
+    sockaddr_storage source{};
+    socklen_t length = sizeof(source);
+    const auto count = ::recvfrom(
+        m_fd,
+        buffer.data(),
+        buffer.size(),
+        0,
+        reinterpret_cast<sockaddr*>(&source),
+        &length
+    );
+    if (count < 0)
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            return std::nullopt;
+        }
+        throw std::system_error(
+            errno,
+            std::generic_category(),
+            "recvfrom"
+        );
+    }
+    return Datagram{
+        count,
+        Address(reinterpret_cast<const sockaddr*>(&source), length)};
 }
 
 } // namespace sylar

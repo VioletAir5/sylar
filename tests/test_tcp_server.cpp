@@ -10,6 +10,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -306,5 +307,98 @@ TEST(TcpServerTest, ListensOnUnixAddress)
     io.run();
     ::close(client);
     ::unlink(path.c_str());
+    EXPECT_TRUE(handled);
+}
+
+TEST(TcpServerTest, BindsAndServesTwoAddresses)
+{
+    sylar::IOManager io;
+    int handled = 0;
+    sylar::TcpServer server(
+        io,
+        [&](sylar::IOManager&, int fd)
+        {
+            char byte = 0;
+            if (::recv(fd, &byte, 1, 0) == 1)
+            {
+                ++handled;
+            }
+            if (handled == 2)
+            {
+                server.stop();
+            }
+        }
+    );
+    EXPECT_THROW(
+        server.start(std::vector<sylar::Address>{}),
+        std::invalid_argument
+    );
+    server.start(std::vector<sylar::Address>{
+        sylar::Address::ipv4("127.0.0.1", 0),
+        sylar::Address::ipv4("127.0.0.1", 0)});
+    const auto addresses = server.localAddresses();
+    ASSERT_EQ(addresses.size(), 2);
+    EXPECT_NE(addresses[0].port(), addresses[1].port());
+    for (const auto& address : addresses)
+    {
+        const int client = ::socket(
+            AF_INET,
+            SOCK_STREAM | SOCK_CLOEXEC,
+            0
+        );
+        ASSERT_GE(client, 0);
+        ASSERT_EQ(
+            ::connect(client, address.data(), address.size()),
+            0
+        );
+        ASSERT_EQ(::send(client, "x", 1, MSG_NOSIGNAL), 1);
+        ::close(client);
+    }
+    io.run();
+    EXPECT_EQ(handled, 2);
+    EXPECT_TRUE(server.localAddresses().empty());
+}
+
+TEST(TcpServerTest, ListensOnIpv6Loopback)
+{
+    const int probe = ::socket(
+        AF_INET6,
+        SOCK_STREAM | SOCK_CLOEXEC,
+        0
+    );
+    if (probe < 0)
+    {
+        GTEST_SKIP() << "IPv6 is unavailable";
+    }
+    ::close(probe);
+
+    sylar::IOManager io;
+    bool handled = false;
+    sylar::TcpServer server(
+        io,
+        [&](sylar::IOManager&, int fd)
+        {
+            char value = 0;
+            handled = ::recv(fd, &value, 1, 0) == 1 && value == 'v';
+            server.stop();
+        }
+    );
+    server.start(sylar::Address::ipv6("::1", 0));
+    const auto addresses = server.localAddresses();
+    ASSERT_EQ(addresses.size(), 1);
+    ASSERT_EQ(addresses[0].family(), AF_INET6);
+    const int client = ::socket(
+        AF_INET6,
+        SOCK_STREAM | SOCK_CLOEXEC,
+        0
+    );
+    ASSERT_GE(client, 0);
+    ASSERT_EQ(
+        ::connect(client, addresses[0].data(), addresses[0].size()),
+        0
+    );
+    ASSERT_EQ(::send(client, "v", 1, MSG_NOSIGNAL), 1);
+    io.run();
+    ::close(client);
     EXPECT_TRUE(handled);
 }

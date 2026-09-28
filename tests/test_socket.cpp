@@ -89,3 +89,51 @@ TEST(SocketTest, ConnectAcceptAndExchangeOnFiber)
     io.run();
     EXPECT_EQ(received, "hello");
 }
+
+TEST(SocketTest, ExchangesUdpDatagramAndReportsSource)
+{
+    sylar::IOManager io;
+    auto receiver = sylar::Socket::udp();
+    receiver.bind(sylar::Address::ipv4("127.0.0.1", 0));
+    auto sender = sylar::Socket::udp();
+    sender.bind(sylar::Address::ipv4("127.0.0.1", 0));
+    std::string received;
+    std::uint16_t source_port = 0;
+    io.schedule(
+        [&]
+        {
+            std::array<std::byte, 16> buffer{};
+            auto datagram = receiver.recvFrom(buffer);
+            if (!datagram)
+            {
+                EXPECT_EQ(
+                    io.waitReadable(receiver.fd(), 1s),
+                    sylar::IOManager::WaitResult::Ready
+                );
+                datagram = receiver.recvFrom(buffer);
+            }
+            ASSERT_TRUE(datagram);
+            received.assign(
+                reinterpret_cast<const char*>(buffer.data()),
+                datagram->count
+            );
+            source_port = datagram->source.port();
+        }
+    );
+    io.schedule(
+        [&]
+        {
+            const std::string message = "udp";
+            EXPECT_EQ(
+                sender.sendTo(
+                    std::as_bytes(std::span(message)),
+                    receiver.localAddress()
+                ),
+                3
+            );
+        }
+    );
+    io.run();
+    EXPECT_EQ(received, "udp");
+    EXPECT_EQ(source_port, sender.localAddress().port());
+}
