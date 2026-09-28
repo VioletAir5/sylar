@@ -53,3 +53,11 @@ add_test(
         $<TARGET_FILE:ws_echo_server>
 )
 set_tests_properties(WebSocketApp.ProtocolAndShutdown PROPERTIES TIMEOUT 20)
+
+add_test(
+    NAME SqliteApp.PersistsAcrossProcesses
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_sqlite_app.py"
+        $<TARGET_FILE:sqlite_demo>
+)
+set_tests_properties(SqliteApp.PersistsAcrossProcesses PROPERTIES TIMEOUT 10)
