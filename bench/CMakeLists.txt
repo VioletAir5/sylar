@@ -17,3 +17,8 @@ if(SYLAR_BENCH_WITH_SPDLOG)
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
     )
 endif()
+
+add_executable(sylar_echo_bench bench_echo.cpp)
+target_compile_options(sylar_echo_bench PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
