@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "net/TcpServer.hpp"
+#include "net/TlsStream.hpp"
 
 #include "fiber/IOManager.hpp"
 #include "fiber/IOManagerPool.hpp"
@@ -18,12 +19,15 @@ class HttpServer
 {
 public:
     HttpServer(
-        IOManager& io, std::shared_ptr<ServletDispatch> dispatch
+        IOManager& io,
+        std::shared_ptr<ServletDispatch> dispatch,
+        std::shared_ptr<TlsContext> tls = {}
     );
     HttpServer(
         IOManager& acceptor,
         IOManagerPool& workers,
-        std::shared_ptr<ServletDispatch> dispatch
+        std::shared_ptr<ServletDispatch> dispatch,
+        std::shared_ptr<TlsContext> tls = {}
     );
 
     void start(const std::string& ipv4, std::uint16_t port);

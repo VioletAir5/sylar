@@ -33,3 +33,15 @@ add_test(
         $<TARGET_FILE:http_server>
 )
 set_tests_properties(HttpApp.PipeliningAndShutdown PROPERTIES TIMEOUT 5)
+
+find_program(OPENSSL_EXECUTABLE openssl)
+if(OPENSSL_EXECUTABLE)
+    add_test(
+        NAME HttpsApp.VerificationAndShutdown
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_https_app.py"
+            $<TARGET_FILE:http_server>
+            $<TARGET_FILE:http_client>
+    )
+    set_tests_properties(HttpsApp.VerificationAndShutdown PROPERTIES TIMEOUT 20)
+endif()

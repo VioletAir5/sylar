@@ -1,8 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 #include <string>
 #include <unordered_map>
+
+#include "net/TlsStream.hpp"
 
 #include "fiber/IOManager.hpp"
 #include "http/Http.hpp"
@@ -20,7 +23,8 @@ public:
         std::string method = "GET",
         std::string body = {},
         std::unordered_map<std::string, std::string> headers = {},
-        std::chrono::milliseconds timeout = std::chrono::seconds(30)
+        std::chrono::milliseconds timeout = std::chrono::seconds(30),
+        std::shared_ptr<TlsContext> tls = {}
     );
 };
 

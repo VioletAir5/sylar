@@ -2,12 +2,14 @@
 
 #include <cerrno>
 #include <chrono>
+#include <memory>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
 
 #include "net/Socket.hpp"
 #include "net/SocketStream.hpp"
+#include "net/TlsStream.hpp"
 
 #include "http/Http.hpp"
 
@@ -16,23 +18,39 @@ namespace sylar
 namespace
 {
 
-TcpServer::Handler
-makeHandler(std::shared_ptr<ServletDispatch> dispatch)
+TcpServer::Handler makeHandler(
+    std::shared_ptr<ServletDispatch> dispatch,
+    std::shared_ptr<TlsContext> tls
+)
 {
     if (!dispatch)
     {
         throw std::invalid_argument("null servlet dispatch");
     }
-    return [dispatch = std::move(dispatch)](IOManager& io, int fd)
+    return [dispatch = std::move(dispatch),
+            tls = std::move(tls)](IOManager& io, int fd)
     {
         try
         {
-            SocketStream stream(
-                io,
-                Socket::borrow(fd),
-                std::chrono::seconds(30)
-            );
-            HttpSession session(stream);
+            std::unique_ptr<Stream> stream;
+            if (tls)
+            {
+                stream = std::make_unique<TlsStream>(
+                    io,
+                    Socket::borrow(fd),
+                    tls,
+                    TlsStream::Role::Server
+                );
+            }
+            else
+            {
+                stream = std::make_unique<SocketStream>(
+                    io,
+                    Socket::borrow(fd),
+                    std::chrono::seconds(30)
+                );
+            }
+            HttpSession session(*stream);
             HttpRequest request;
             while (true)
             {
@@ -72,7 +90,7 @@ makeHandler(std::shared_ptr<ServletDispatch> dispatch)
                 }
             }
         }
-        catch (const std::system_error&)
+        catch (const std::exception&)
         {
             // Peer closure, timeout or I/O cancellation ends a
             // session.
@@ -83,18 +101,25 @@ makeHandler(std::shared_ptr<ServletDispatch> dispatch)
 } // namespace
 
 HttpServer::HttpServer(
-    IOManager& io, std::shared_ptr<ServletDispatch> dispatch
+    IOManager& io,
+    std::shared_ptr<ServletDispatch> dispatch,
+    std::shared_ptr<TlsContext> tls
 )
-    : m_tcp(io, makeHandler(std::move(dispatch)))
+    : m_tcp(io, makeHandler(std::move(dispatch), std::move(tls)))
 {
 }
 
 HttpServer::HttpServer(
     IOManager& acceptor,
     IOManagerPool& workers,
-    std::shared_ptr<ServletDispatch> dispatch
+    std::shared_ptr<ServletDispatch> dispatch,
+    std::shared_ptr<TlsContext> tls
 )
-    : m_tcp(acceptor, workers, makeHandler(std::move(dispatch)))
+    : m_tcp(
+          acceptor,
+          workers,
+          makeHandler(std::move(dispatch), std::move(tls))
+      )
 {
 }
 

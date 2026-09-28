@@ -15,10 +15,10 @@
 | ByteArray | 已实现 | 固定宽度、Varint、字符串、文件读写 |
 | TcpServer | 已实现 | 多地址监听、多线程分派、统一停机 |
 | Stream | 已实现 | Stream 与 SocketStream |
-| HTTP | 部分 | HTTP/1.1 服务端、客户端、keep-alive、chunked；仍需完善协议边界与性能 |
+| HTTP | 部分 | HTTP/1.1 服务端、客户端、keep-alive、chunked、TLS；仍需完善协议边界与性能 |
 | Servlet | 已实现 | 精确和前缀路由、FunctionServlet、404 回退 |
 
-上游仓库简介还提到 WebSocket、HTTPS、SMTP、MySQL、SQLite3、ORM、Redis、ZooKeeper 等扩展。这些目前尚未移植。跨模块改动按协议基础、Hook 与生命周期、扩展协议、外部服务适配的顺序推进。
+上游仓库简介还提到 WebSocket、HTTPS、SMTP、MySQL、SQLite3、ORM、Redis、ZooKeeper 等扩展。其中 HTTPS 已有证书验证的客户端与服务端，其余尚未移植。跨模块改动按协议基础、Hook 与生命周期、扩展协议、外部服务适配的顺序推进。
 
 ## 验收原则
 

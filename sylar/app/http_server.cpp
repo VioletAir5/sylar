@@ -85,10 +85,13 @@ int main(int argc, char** argv)
 {
     try
     {
-        if (argc > 3)
+        const bool tls_mode = argc == 6 &&
+                              std::string_view(argv[3]) == "--tls";
+        if (argc > 3 && !tls_mode)
         {
             throw std::invalid_argument(
-                "usage: http_server [port] [workers]"
+                "usage: http_server [port] [workers] "
+                "[--tls cert.pem key.pem]"
             );
         }
         const auto port = argc > 1 ? parsePositive(argv[1]) : 8080;
@@ -102,11 +105,14 @@ int main(int argc, char** argv)
         sylar::SignalFd signals;
         sylar::IOManager io;
         sylar::IOManagerPool pool(workers);
-        sylar::HttpServer server(io, pool, routes());
+        auto tls = tls_mode
+                       ? sylar::TlsContext::server(argv[4], argv[5])
+                       : std::shared_ptr<sylar::TlsContext>{};
+        sylar::HttpServer server(io, pool, routes(), std::move(tls));
         server.start("0.0.0.0", static_cast<std::uint16_t>(port));
-        std::cout << "http_server listening on port "
-                  << server.localPort() << " workers=" << workers
-                  << std::endl;
+        std::cout << (tls_mode ? "https_server" : "http_server")
+                  << " listening on port " << server.localPort()
+                  << " workers=" << workers << std::endl;
         io.schedule(
             [&]
             {

@@ -5,6 +5,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstddef>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -12,6 +13,7 @@
 #include "net/Address.hpp"
 #include "net/Socket.hpp"
 #include "net/SocketStream.hpp"
+#include "net/TlsStream.hpp"
 
 namespace sylar
 {
@@ -272,14 +274,13 @@ HttpResponse HttpClient::request(
     std::string method,
     std::string body,
     std::unordered_map<std::string, std::string> headers,
-    std::chrono::milliseconds timeout
+    std::chrono::milliseconds timeout,
+    std::shared_ptr<TlsContext> tls
 )
 {
-    if (uri.scheme != "http")
+    if (uri.scheme != "http" && uri.scheme != "https")
     {
-        throw std::invalid_argument(
-            "HttpClient currently supports HTTP only"
-        );
+        throw std::invalid_argument("unsupported HTTP URL scheme");
     }
     if (method.empty() ||
         method.find_first_of(" \t\r\n") != std::string::npos)
@@ -296,7 +297,30 @@ HttpResponse HttpClient::request(
     }
     auto socket = Socket::tcp(addresses.front().family());
     socket.connect(io, addresses.front(), timeout);
-    SocketStream stream(io, std::move(socket), timeout);
+    std::unique_ptr<Stream> stream;
+    if (uri.scheme == "https")
+    {
+        if (!tls)
+        {
+            tls = TlsContext::client();
+        }
+        stream = std::make_unique<TlsStream>(
+            io,
+            std::move(socket),
+            std::move(tls),
+            TlsStream::Role::Client,
+            uri.host,
+            timeout
+        );
+    }
+    else
+    {
+        stream = std::make_unique<SocketStream>(
+            io,
+            std::move(socket),
+            timeout
+        );
+    }
     std::string wire = method + " " + uri.target +
                        " HTTP/1.1\r\nHost: " + uri.authority() +
                        "\r\n";
@@ -321,8 +345,8 @@ HttpResponse HttpClient::request(
     wire += "Content-Length: " + std::to_string(body.size()) + "\r\n";
     wire += "Connection: close\r\n\r\n";
     wire += body;
-    stream.writeAll(std::as_bytes(std::span(wire)));
-    return readResponse(stream, method);
+    stream->writeAll(std::as_bytes(std::span(wire)));
+    return readResponse(*stream, method);
 }
 
 } // namespace sylar
