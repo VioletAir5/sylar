@@ -77,3 +77,11 @@ add_test(
         $<TARGET_FILE:redis_demo>
 )
 set_tests_properties(RedisApp.TypedRepliesAndShutdown PROPERTIES TIMEOUT 20)
+
+add_test(
+    NAME MySqlApp.PreparedQueryAndShutdown
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_mysql_app.py"
+        $<TARGET_FILE:mysql_demo>
+)
+set_tests_properties(MySqlApp.PreparedQueryAndShutdown PROPERTIES TIMEOUT 60)

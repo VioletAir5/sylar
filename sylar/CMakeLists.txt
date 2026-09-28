@@ -5,6 +5,7 @@ find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(HIREDIS REQUIRED IMPORTED_TARGET hiredis)
+pkg_check_modules(MYSQLCLIENT REQUIRED IMPORTED_TARGET mysqlclient)
 
 # Reconfigure when a source file is added, so new modules need no CMake edit.
 file(GLOB_RECURSE SYLAR_SOURCES CONFIGURE_DEPENDS
@@ -16,7 +17,7 @@ file(GLOB_RECURSE SYLAR_SOURCES CONFIGURE_DEPENDS
 if(SYLAR_SOURCES)
     add_library(sylar_core STATIC ${SYLAR_SOURCES})
     target_include_directories(sylar_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
-    target_link_libraries(sylar_core PUBLIC fmt::fmt yaml-cpp Boost::context OpenSSL::SSL OpenSSL::Crypto SQLite::SQLite3 PkgConfig::HIREDIS)
+    target_link_libraries(sylar_core PUBLIC fmt::fmt yaml-cpp Boost::context OpenSSL::SSL OpenSSL::Crypto SQLite::SQLite3 PkgConfig::HIREDIS PkgConfig::MYSQLCLIENT)
     target_compile_options(sylar_core PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
     )
@@ -24,7 +25,7 @@ else()
     # The repository can configure before the first implementation file exists.
     add_library(sylar_core INTERFACE)
     target_include_directories(sylar_core INTERFACE "${PROJECT_SOURCE_DIR}/include")
-    target_link_libraries(sylar_core INTERFACE fmt::fmt yaml-cpp Boost::context OpenSSL::SSL OpenSSL::Crypto SQLite::SQLite3 PkgConfig::HIREDIS)
+    target_link_libraries(sylar_core INTERFACE fmt::fmt yaml-cpp Boost::context OpenSSL::SSL OpenSSL::Crypto SQLite::SQLite3 PkgConfig::HIREDIS PkgConfig::MYSQLCLIENT)
 endif()
 
 file(GLOB SYLAR_APPS CONFIGURE_DEPENDS
