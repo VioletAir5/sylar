@@ -5,6 +5,7 @@
 - [配置系统](docs/configuration.md)
 
 - [开发计划与当前范围](docs/roadmap.md)
+- [TCP echo 初始基准](docs/echo_benchmark.md)
 
 ## TCP echo 示例
 

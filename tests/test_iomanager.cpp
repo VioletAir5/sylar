@@ -99,7 +99,7 @@ TEST(IOManagerTest, ResumesReaderAfterSocketBecomesReadable)
         [&]
         {
             const char message[] = "hello";
-            ::write(sockets.second(), message, 5);
+            EXPECT_EQ(::write(sockets.second(), message, 5), 5);
         }
     );
 
@@ -135,7 +135,7 @@ TEST(IOManagerTest, SupportsReadAndWriteWaitersOnOneFd)
         [&]
         {
             const char message = 'x';
-            ::write(sockets.second(), &message, 1);
+            EXPECT_EQ(::write(sockets.second(), &message, 1), 1);
         }
     );
 
