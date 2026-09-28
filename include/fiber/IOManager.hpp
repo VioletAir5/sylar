@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -9,6 +10,7 @@
 #include <unordered_map>
 
 #include "fiber/Scheduler.hpp"
+#include "fiber/TimerManager.hpp"
 
 namespace sylar
 {
@@ -26,7 +28,8 @@ public:
     enum class WaitResult
     {
         Ready,
-        Cancelled
+        Cancelled,
+        TimedOut
     };
 
     IOManager();
@@ -45,6 +48,17 @@ public:
     // The file descriptor must be nonblocking.
     WaitResult waitReadable(int fd);
     WaitResult waitWritable(int fd);
+    WaitResult
+    waitReadable(int fd, std::chrono::milliseconds timeout);
+    WaitResult
+    waitWritable(int fd, std::chrono::milliseconds timeout);
+
+    TimerManager::TimerId addTimer(
+        std::chrono::milliseconds delay,
+        std::function<void()> callback
+    );
+    bool cancelTimer(TimerManager::TimerId id);
+    void sleepFor(std::chrono::milliseconds delay);
 
     bool cancel(int fd, Event event);
     void run();
@@ -76,7 +90,11 @@ private:
     void registerWait(
         int fd, Event event, const std::shared_ptr<WaitState>& state
     );
-    WaitResult wait(int fd, Event event);
+    WaitResult wait(
+        int fd,
+        Event event,
+        std::optional<std::chrono::milliseconds> timeout
+    );
     bool updateInterest(
         int fd, std::uint32_t old_mask, std::uint32_t new_mask
     );
@@ -85,6 +103,7 @@ private:
 
     std::thread::id m_ownerThread;
     Scheduler m_scheduler;
+    TimerManager m_timers;
     int m_epollFd = -1;
     std::unordered_map<int, FdContext> m_waiters;
     std::size_t m_pendingEvents = 0;

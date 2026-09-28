@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cerrno>
+#include <limits>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
@@ -172,11 +173,50 @@ void IOManager::registerWait(
     ++m_pendingEvents;
 }
 
-IOManager::WaitResult IOManager::wait(int fd, Event event)
+IOManager::WaitResult IOManager::wait(
+    int fd,
+    Event event,
+    std::optional<std::chrono::milliseconds> timeout
+)
 {
+    if (timeout && timeout->count() < 0)
+    {
+        throw std::invalid_argument("negative I/O timeout");
+    }
+
     auto state = std::make_shared<WaitState>();
     registerWait(fd, event, state);
+    TimerManager::TimerId timer_id = 0;
+    if (timeout)
+    {
+        try
+        {
+            timer_id = m_timers.addAfter(
+                *timeout,
+                [this, fd, event, state]
+                {
+                    if (!state->result)
+                    {
+                        finish(
+                            fd,
+                            eventMask(event),
+                            WaitResult::TimedOut
+                        );
+                    }
+                }
+            );
+        }
+        catch (...)
+        {
+            cancel(fd, event);
+            throw;
+        }
+    }
     Fiber::YieldToHold();
+    if (timer_id != 0)
+    {
+        m_timers.cancel(timer_id);
+    }
 
     if (!state->result)
     {
@@ -191,12 +231,55 @@ IOManager::WaitResult IOManager::wait(int fd, Event event)
 
 IOManager::WaitResult IOManager::waitReadable(int fd)
 {
-    return wait(fd, Event::Read);
+    return wait(fd, Event::Read, std::nullopt);
 }
 
 IOManager::WaitResult IOManager::waitWritable(int fd)
 {
-    return wait(fd, Event::Write);
+    return wait(fd, Event::Write, std::nullopt);
+}
+
+IOManager::WaitResult
+IOManager::waitReadable(int fd, std::chrono::milliseconds timeout)
+{
+    return wait(fd, Event::Read, timeout);
+}
+
+IOManager::WaitResult
+IOManager::waitWritable(int fd, std::chrono::milliseconds timeout)
+{
+    return wait(fd, Event::Write, timeout);
+}
+
+TimerManager::TimerId IOManager::addTimer(
+    std::chrono::milliseconds delay, std::function<void()> callback
+)
+{
+    requireOwnerThread();
+    return m_timers.addAfter(delay, std::move(callback));
+}
+
+bool IOManager::cancelTimer(TimerManager::TimerId id)
+{
+    requireOwnerThread();
+    return m_timers.cancel(id);
+}
+
+void IOManager::sleepFor(std::chrono::milliseconds delay)
+{
+    requireOwnerThread();
+    auto* fiber = Fiber::GetCurrent();
+    if (Scheduler::GetThis() != &m_scheduler || !fiber ||
+        fiber->getId() == 0)
+    {
+        throw std::logic_error("sleep requires an IOManager Fiber");
+    }
+    const auto fiber_id = fiber->getId();
+    m_timers.addAfter(
+        delay,
+        [this, fiber_id] { m_scheduler.wake(fiber_id); }
+    );
+    Fiber::YieldToHold();
 }
 
 bool IOManager::finish(
@@ -268,6 +351,13 @@ bool IOManager::cancel(int fd, Event event)
 void IOManager::waitForEvents()
 {
     std::array<epoll_event, 64> events{};
+    int timeout = -1;
+    if (const auto next = m_timers.nextTimeout())
+    {
+        timeout = next->count() > std::numeric_limits<int>::max()
+                      ? std::numeric_limits<int>::max()
+                      : static_cast<int>(next->count());
+    }
     int count;
     do
     {
@@ -275,7 +365,7 @@ void IOManager::waitForEvents()
             m_epollFd,
             events.data(),
             static_cast<int>(events.size()),
-            -1
+            timeout
         );
     } while (count < 0 && errno == EINTR);
 
@@ -311,7 +401,15 @@ void IOManager::run()
     for (;;)
     {
         m_scheduler.run();
-        if (m_pendingEvents == 0)
+        for (auto& callback : m_timers.takeExpired())
+        {
+            m_scheduler.schedule(std::move(callback));
+        }
+        if (m_scheduler.readyCount() != 0)
+        {
+            continue;
+        }
+        if (m_pendingEvents == 0 && m_timers.empty())
         {
             return;
         }
