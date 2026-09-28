@@ -85,3 +85,11 @@ add_test(
         $<TARGET_FILE:mysql_demo>
 )
 set_tests_properties(MySqlApp.PreparedQueryAndShutdown PROPERTIES TIMEOUT 60)
+
+add_test(
+    NAME ZooKeeperApp.NodesAndShutdown
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_zk_app.py"
+        $<TARGET_FILE:zk_demo>
+)
+set_tests_properties(ZooKeeperApp.NodesAndShutdown PROPERTIES TIMEOUT 30)
