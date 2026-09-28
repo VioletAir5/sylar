@@ -40,13 +40,19 @@ struct OwnedFd
 
 struct TcpServer::State
 {
-    State(IOManager& io_ref, Handler connection_handler)
+    State(
+        IOManager& io_ref,
+        IOManagerPool* worker_pool,
+        Handler connection_handler
+    )
         : io(io_ref)
+        , workers(worker_pool)
         , handler(std::move(connection_handler))
     {
     }
 
     IOManager& io;
+    IOManagerPool* workers;
     Handler handler;
     int listener = -1;
     std::uint16_t port = 0;
@@ -55,7 +61,21 @@ struct TcpServer::State
 };
 
 TcpServer::TcpServer(IOManager& io, Handler handler)
-    : m_state(std::make_shared<State>(io, std::move(handler)))
+    : m_state(std::make_shared<State>(io, nullptr, std::move(handler))
+      )
+{
+    if (!m_state->handler)
+    {
+        throw std::invalid_argument("TcpServer handler is empty");
+    }
+}
+
+TcpServer::TcpServer(
+    IOManager& acceptor, IOManagerPool& workers, Handler handler
+)
+    : m_state(std::make_shared<State>(
+          acceptor, &workers, std::move(handler)
+      ))
 {
     if (!m_state->handler)
     {
@@ -210,10 +230,20 @@ void TcpServer::acceptLoop(const std::shared_ptr<State>& state)
                 ::close(fd);
                 throw;
             }
-            state->io.schedule(
-                [state, client]
-                { state->handler(state->io, client->fd); }
-            );
+            if (state->workers)
+            {
+                state->workers->post(
+                    [state, client](IOManager& worker)
+                    { state->handler(worker, client->fd); }
+                );
+            }
+            else
+            {
+                state->io.schedule(
+                    [state, client]
+                    { state->handler(state->io, client->fd); }
+                );
+            }
             continue;
         }
         if (errno == EINTR || errno == ECONNABORTED)

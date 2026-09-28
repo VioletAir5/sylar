@@ -1,0 +1,6 @@
+server:
+  port: 9000
+  workers: 4
+  idle_timeout_ms: 30000
+log:
+  level: INFO

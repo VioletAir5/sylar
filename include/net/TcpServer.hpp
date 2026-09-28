@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fiber/IOManager.hpp"
+#include "fiber/IOManagerPool.hpp"
 
 namespace sylar
 {
@@ -19,6 +20,9 @@ public:
     using Handler = std::function<void(IOManager&, int)>;
 
     TcpServer(IOManager& io, Handler handler);
+    TcpServer(
+        IOManager& acceptor, IOManagerPool& workers, Handler handler
+    );
     ~TcpServer();
 
     TcpServer(const TcpServer&) = delete;

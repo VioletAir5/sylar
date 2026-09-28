@@ -5,6 +5,7 @@
 - [配置系统](docs/configuration.md)
 
 - [开发计划与当前范围](docs/roadmap.md)
+- [协程网络架构](docs/architecture.md)
 - [TCP echo 初始基准](docs/echo_benchmark.md)
 
 ## TCP echo 示例
@@ -13,7 +14,9 @@
 cmake -S . -B build
 cmake --build build -j
 ctest --test-dir build --output-on-failure
-./build/sylar/echo_server 9000
+./build/sylar/echo_server --config conf/echo.yml
 ```
 
 当前 I/O 调度为单线程，socket 使用非阻塞模式；读写等待和超时由 IOManager 显式管理。
+
+也可运行 `./build/sylar/echo_server 9000 4`；第二个数字是 I/O 工作线程数。按 Ctrl+C 或发送 SIGTERM 会停止监听并回收工作线程。
