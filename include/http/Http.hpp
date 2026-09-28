@@ -46,6 +46,7 @@ public:
     // false means a clean EOF before the next request.
     bool readRequest(HttpRequest& request);
     void sendResponse(const HttpResponse& response, bool keep_alive);
+    std::string takeBuffered();
 
 private:
     Stream& m_stream;

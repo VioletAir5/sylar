@@ -392,6 +392,11 @@ bool HttpSession::readRequest(HttpRequest& request)
     return true;
 }
 
+std::string HttpSession::takeBuffered()
+{
+    return std::move(m_buffer);
+}
+
 void HttpSession::sendResponse(
     const HttpResponse& response, bool keep_alive
 )

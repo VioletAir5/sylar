@@ -45,3 +45,11 @@ if(OPENSSL_EXECUTABLE)
     )
     set_tests_properties(HttpsApp.VerificationAndShutdown PROPERTIES TIMEOUT 20)
 endif()
+
+add_test(
+    NAME WebSocketApp.ProtocolAndShutdown
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_websocket_app.py"
+        $<TARGET_FILE:ws_echo_server>
+)
+set_tests_properties(WebSocketApp.ProtocolAndShutdown PROPERTIES TIMEOUT 20)
