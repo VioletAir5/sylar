@@ -69,3 +69,11 @@ add_test(
         $<TARGET_FILE:smtp_demo>
 )
 set_tests_properties(SmtpApp.PlainTlsAndReject PROPERTIES TIMEOUT 20)
+
+add_test(
+    NAME RedisApp.TypedRepliesAndShutdown
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_redis_app.py"
+        $<TARGET_FILE:redis_demo>
+)
+set_tests_properties(RedisApp.TypedRepliesAndShutdown PROPERTIES TIMEOUT 20)
