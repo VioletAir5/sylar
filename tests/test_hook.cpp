@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -154,4 +155,123 @@ TEST(HookTest, ConnectAndAcceptUseFiberWaits)
     );
     io.run();
     EXPECT_EQ(received, 'c');
+}
+
+TEST(HookTest, UdpReceiveYieldsAndCloseCancelsWait)
+{
+    sylar::IOManager io;
+    auto receiver = sylar::Socket::udp();
+    receiver.bind(sylar::Address::ipv4("127.0.0.1", 0));
+    auto sender = sylar::Socket::udp();
+    char received = 0;
+    io.schedule(
+        [&]
+        {
+            sylar::HookScope hooks(1s);
+            EXPECT_EQ(
+                ::recvfrom(
+                    receiver.fd(),
+                    &received,
+                    1,
+                    0,
+                    nullptr,
+                    nullptr
+                ),
+                1
+            );
+        }
+    );
+    io.schedule(
+        [&]
+        {
+            sylar::HookScope hooks(1s);
+            const auto address = receiver.localAddress();
+            EXPECT_EQ(
+                ::sendto(
+                    sender.fd(),
+                    "u",
+                    1,
+                    0,
+                    address.data(),
+                    address.size()
+                ),
+                1
+            );
+        }
+    );
+    io.run();
+    EXPECT_EQ(received, 'u');
+
+    int fds[2];
+    ASSERT_EQ(
+        ::socketpair(
+            AF_UNIX,
+            SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+            0,
+            fds
+        ),
+        0
+    );
+    int wait_error = 0;
+    io.schedule(
+        [&]
+        {
+            sylar::HookScope hooks(1s);
+            char byte;
+            EXPECT_EQ(::read(fds[0], &byte, 1), -1);
+            wait_error = errno;
+        }
+    );
+    io.schedule(
+        [&]
+        {
+            sylar::HookScope hooks(1s);
+            EXPECT_EQ(::close(fds[0]), 0);
+        }
+    );
+    io.run();
+    ::close(fds[1]);
+    EXPECT_EQ(wait_error, ECANCELED);
+}
+
+TEST(HookTest, VectorIoYieldsAndPreservesSegments)
+{
+    int fds[2];
+    ASSERT_EQ(
+        ::socketpair(
+            AF_UNIX,
+            SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+            0,
+            fds
+        ),
+        0
+    );
+    sylar::IOManager io;
+    char first[2]{};
+    char second[2]{};
+    io.schedule(
+        [&]
+        {
+            sylar::HookScope hooks(1s);
+            iovec buffers[] = {
+                {first, sizeof(first)},
+                {second, sizeof(second)}};
+            EXPECT_EQ(::readv(fds[0], buffers, 2), 4);
+        }
+    );
+    io.schedule(
+        [&]
+        {
+            sylar::HookScope hooks(1s);
+            char a[] = "ab";
+            char b[] = "cd";
+            iovec buffers[] = {{a, 2}, {b, 2}};
+            EXPECT_EQ(::writev(fds[1], buffers, 2), 4);
+        }
+    );
+    io.run();
+    ::close(fds[0]);
+    ::close(fds[1]);
+    EXPECT_EQ(std::string(first, 2), "ab");
+    EXPECT_EQ(std::string(second, 2), "cd");
 }

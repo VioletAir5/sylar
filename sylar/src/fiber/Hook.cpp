@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
+#include <sys/uio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -259,6 +260,112 @@ send(int fd, const void* buffer, size_t count, int flags)
             );
         }
     );
+}
+
+extern "C" ssize_t readv(int fd, const iovec* buffers, int count)
+{
+    return sylar::socketCall(
+        fd,
+        sylar::IOManager::Event::Read,
+        [&] { return ::syscall(SYS_readv, fd, buffers, count); }
+    );
+}
+
+extern "C" ssize_t writev(int fd, const iovec* buffers, int count)
+{
+    return sylar::socketCall(
+        fd,
+        sylar::IOManager::Event::Write,
+        [&] { return ::syscall(SYS_writev, fd, buffers, count); }
+    );
+}
+
+extern "C" ssize_t recvfrom(
+    int fd,
+    void* buffer,
+    size_t count,
+    int flags,
+    sockaddr* source,
+    socklen_t* source_length
+)
+{
+    return sylar::socketCall(
+        fd,
+        sylar::IOManager::Event::Read,
+        [&]
+        {
+            return ::syscall(
+                SYS_recvfrom,
+                fd,
+                buffer,
+                count,
+                flags,
+                source,
+                source_length
+            );
+        }
+    );
+}
+
+extern "C" ssize_t sendto(
+    int fd,
+    const void* buffer,
+    size_t count,
+    int flags,
+    const sockaddr* destination,
+    socklen_t destination_length
+)
+{
+    return sylar::socketCall(
+        fd,
+        sylar::IOManager::Event::Write,
+        [&]
+        {
+            return ::syscall(
+                SYS_sendto,
+                fd,
+                buffer,
+                count,
+                flags,
+                destination,
+                destination_length
+            );
+        }
+    );
+}
+
+extern "C" ssize_t recvmsg(int fd, msghdr* message, int flags)
+{
+    return sylar::socketCall(
+        fd,
+        sylar::IOManager::Event::Read,
+        [&] { return ::syscall(SYS_recvmsg, fd, message, flags); }
+    );
+}
+
+extern "C" ssize_t sendmsg(int fd, const msghdr* message, int flags)
+{
+    return sylar::socketCall(
+        fd,
+        sylar::IOManager::Event::Write,
+        [&] { return ::syscall(SYS_sendmsg, fd, message, flags); }
+    );
+}
+
+extern "C" int close(int fd)
+{
+    if (auto* io = sylar::activeIo())
+    {
+        try
+        {
+            io->cancel(fd, sylar::IOManager::Event::Read);
+            io->cancel(fd, sylar::IOManager::Event::Write);
+        }
+        catch (...)
+        {
+        }
+    }
+    return static_cast<int>(::syscall(SYS_close, fd));
 }
 
 extern "C" int
