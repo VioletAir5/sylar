@@ -9,4 +9,4 @@
 
 第二个命令重复执行时，`requests` 计数会继续增加。测试还覆盖内存数据库、类型化数据、异常 SQL、回滚与跨进程持久化。
 
-SQLite3 调用目前是同步的，会阻塞所在的 IOManager 工作线程。高并发请求中应将数据库任务交给独立线程池，或保持事务极短；本模块尚未提供异步数据库调度、连接池或 ORM。构建需要 SQLite3 开发包，例如 Ubuntu 的 `libsqlite3-dev`。
+SQLite3 调用本身是同步的。高并发请求中可用 [BlockingExecutor](blocking_executor.md) 把查询移到专用线程，并在 Fiber 中等待结果；仍需控制同一连接上的事务并发。本模块尚未提供连接池或 ORM。构建需要 SQLite3 开发包，例如 Ubuntu 的 `libsqlite3-dev`。
