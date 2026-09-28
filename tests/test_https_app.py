@@ -9,6 +9,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+CRLF = bytes((13, 10))
+
 
 def free_port():
     with socket.socket() as probe:
@@ -54,7 +56,7 @@ def main(server_executable, client_executable):
             with socket.create_connection(
                 ("127.0.0.1", port), timeout=2
             ) as plain:
-                plain.sendall(b"GET / HTTP/1.1\n\n")
+                plain.sendall(b"GET / HTTP/1.1" + CRLF + CRLF)
 
             context = ssl.create_default_context(cafile=str(cert))
             with socket.create_connection(
@@ -64,15 +66,15 @@ def main(server_executable, client_executable):
                     raw, server_hostname="localhost"
                 ) as verified:
                     verified.sendall(
-                        b"GET /health HTTP/1.1\n"
-                        b"Host: localhost\n"
-                        b"Connection: close\n\n"
+                        b"GET /health HTTP/1.1" + CRLF
+                        + b"Host: localhost" + CRLF
+                        + b"Connection: close" + CRLF + CRLF
                     )
                     wire = b""
                     while chunk := verified.recv(4096):
                         wire += chunk
                     if b"HTTP/1.1 200 OK" not in wire or not wire.endswith(
-                        b"\n\nok\n"
+                        CRLF + CRLF + b"ok" + bytes((10,))
                     ):
                         raise RuntimeError(f"bad response: {wire!r}")
 
