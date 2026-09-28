@@ -103,6 +103,11 @@ void HttpServer::start(const std::string& ipv4, std::uint16_t port)
     m_tcp.start(ipv4, port);
 }
 
+void HttpServer::start(const Address& address)
+{
+    m_tcp.start(address);
+}
+
 void HttpServer::stop()
 {
     m_tcp.stop();

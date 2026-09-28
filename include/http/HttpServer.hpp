@@ -26,6 +26,7 @@ public:
     );
 
     void start(const std::string& ipv4, std::uint16_t port);
+    void start(const Address& address);
     void stop();
     std::uint16_t localPort() const;
 

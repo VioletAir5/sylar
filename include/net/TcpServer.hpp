@@ -5,15 +5,16 @@
 #include <memory>
 #include <string>
 
+#include "net/Address.hpp"
+
 #include "fiber/IOManager.hpp"
 #include "fiber/IOManagerPool.hpp"
 
 namespace sylar
 {
 
-// Single-thread IPv4 listener. Handler borrows the accepted,
-// nonblocking fd for the duration of its Fiber; TcpServer closes it
-// on return.
+// Nonblocking TCP or Unix listener. Handler borrows the accepted
+// fd for the duration of its Fiber; TcpServer closes it on return.
 class TcpServer
 {
 public:
@@ -33,6 +34,7 @@ public:
     // Port zero asks the kernel to choose an available port.
     // A stopped instance cannot be restarted.
     void start(const std::string& ipv4, std::uint16_t port);
+    void start(const Address& address);
     void stop();
     std::uint16_t localPort() const;
     bool running() const;

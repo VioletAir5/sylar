@@ -25,3 +25,11 @@ add_test(
         $<TARGET_FILE:echo_server>
 )
 set_tests_properties(EchoApp.ConfigIdleAndShutdown PROPERTIES TIMEOUT 5)
+
+add_test(
+    NAME HttpApp.PipeliningAndShutdown
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_http_app.py"
+        $<TARGET_FILE:http_server>
+)
+set_tests_properties(HttpApp.PipeliningAndShutdown PROPERTIES TIMEOUT 5)

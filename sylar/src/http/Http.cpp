@@ -116,10 +116,15 @@ void parseHead(std::string_view head, HttpRequest& request)
     {
         throw std::invalid_argument("HTTP/1.1 requires Host");
     }
-    if (request.headers.contains("transfer-encoding"))
+    if (const auto encoding = request.header("transfer-encoding"))
     {
-        throw std::invalid_argument("transfer encoding is unsupported"
-        );
+        if (lower(*encoding) != "chunked" ||
+            request.headers.contains("content-length"))
+        {
+            throw std::invalid_argument(
+                "invalid HTTP transfer encoding"
+            );
+        }
     }
 }
 
@@ -253,9 +258,7 @@ bool HttpSession::readRequest(HttpRequest& request)
         std::string_view(m_buffer).substr(0, boundary + 2),
         parsed
     );
-    const auto body_size = contentLength(parsed, m_maxBody);
-    const auto total = boundary + 4 + body_size;
-    while (m_buffer.size() < total)
+    auto readMore = [&]
     {
         const auto count = m_stream.readSome(chunk);
         if (count == 0)
@@ -267,9 +270,124 @@ bool HttpSession::readRequest(HttpRequest& request)
             reinterpret_cast<const char*>(chunk.data()),
             count
         );
+    };
+    if (parsed.header("transfer-encoding"))
+    {
+        std::size_t position = boundary + 4;
+        std::size_t trailer_bytes = 0;
+        for (;;)
+        {
+            auto line_end = m_buffer.find("\r\n", position);
+            while (line_end == std::string::npos)
+            {
+                if (m_buffer.size() - position > m_maxHeader)
+                {
+                    throw std::invalid_argument(
+                        "HTTP chunk line too large"
+                    );
+                }
+                readMore();
+                line_end = m_buffer.find("\r\n", position);
+            }
+            const auto line = std::string_view(m_buffer).substr(
+                position,
+                line_end - position
+            );
+            const auto semicolon = line.find(';');
+            const auto hex = line.substr(0, semicolon);
+            std::size_t count = 0;
+            const auto [last, error] = std::from_chars(
+                hex.data(),
+                hex.data() + hex.size(),
+                count,
+                16
+            );
+            if (hex.empty() || error != std::errc{} ||
+                last != hex.data() + hex.size() ||
+                count > m_maxBody - parsed.body.size())
+            {
+                throw std::invalid_argument("invalid HTTP chunk size"
+                );
+            }
+            position = line_end + 2;
+            if (count == 0)
+            {
+                for (;;)
+                {
+                    line_end = m_buffer.find("\r\n", position);
+                    while (line_end == std::string::npos)
+                    {
+                        if (m_buffer.size() - position +
+                                trailer_bytes >
+                            m_maxHeader)
+                        {
+                            throw std::invalid_argument(
+                                "HTTP trailers too large"
+                            );
+                        }
+                        readMore();
+                        line_end = m_buffer.find("\r\n", position);
+                    }
+                    const auto line_size = line_end - position;
+                    trailer_bytes += line_size + 2;
+                    if (trailer_bytes > m_maxHeader)
+                    {
+                        throw std::invalid_argument(
+                            "HTTP trailers too large"
+                        );
+                    }
+                    if (line_size != 0)
+                    {
+                        const auto trailer = std::string_view(m_buffer
+                        )
+                                                 .substr(
+                                                     position,
+                                                     line_size
+                                                 );
+                        const auto colon = trailer.find(':');
+                        if (colon == std::string_view::npos ||
+                            !validToken(trailer.substr(0, colon)))
+                        {
+                            throw std::invalid_argument(
+                                "invalid HTTP trailer"
+                            );
+                        }
+                    }
+                    position = line_end + 2;
+                    if (line_size == 0)
+                    {
+                        break;
+                    }
+                }
+                break;
+            }
+            while (m_buffer.size() - position < count + 2)
+            {
+                readMore();
+            }
+            parsed.body.append(m_buffer, position, count);
+            position += count;
+            if (m_buffer.compare(position, 2, "\r\n") != 0)
+            {
+                throw std::invalid_argument(
+                    "invalid HTTP chunk terminator"
+                );
+            }
+            position += 2;
+        }
+        m_buffer.erase(0, position);
     }
-    parsed.body = m_buffer.substr(boundary + 4, body_size);
-    m_buffer.erase(0, total);
+    else
+    {
+        const auto body_size = contentLength(parsed, m_maxBody);
+        const auto total = boundary + 4 + body_size;
+        while (m_buffer.size() < total)
+        {
+            readMore();
+        }
+        parsed.body = m_buffer.substr(boundary + 4, body_size);
+        m_buffer.erase(0, total);
+    }
     request = std::move(parsed);
     return true;
 }

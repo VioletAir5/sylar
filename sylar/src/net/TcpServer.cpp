@@ -90,22 +90,19 @@ TcpServer::~TcpServer()
 
 void TcpServer::start(const std::string& ipv4, std::uint16_t port)
 {
+    start(Address::ipv4(ipv4, port));
+}
+
+void TcpServer::start(const Address& bind_address)
+{
     auto& state = *m_state;
     if (state.started)
     {
         throw std::logic_error("TcpServer cannot restart");
     }
 
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_port = htons(port);
-    if (::inet_pton(AF_INET, ipv4.c_str(), &address.sin_addr) != 1)
-    {
-        throw std::invalid_argument("invalid IPv4 address");
-    }
-
     OwnedFd listener(::socket(
-        AF_INET,
+        bind_address.family(),
         SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
         0
     ));
@@ -117,25 +114,28 @@ void TcpServer::start(const std::string& ipv4, std::uint16_t port)
             "socket"
         );
     }
-    const int reuse = 1;
-    if (::setsockopt(
-            listener.fd,
-            SOL_SOCKET,
-            SO_REUSEADDR,
-            &reuse,
-            sizeof(reuse)
-        ) != 0)
+    if (bind_address.family() != AF_UNIX)
     {
-        throw std::system_error(
-            errno,
-            std::generic_category(),
-            "setsockopt"
-        );
+        const int reuse = 1;
+        if (::setsockopt(
+                listener.fd,
+                SOL_SOCKET,
+                SO_REUSEADDR,
+                &reuse,
+                sizeof(reuse)
+            ) != 0)
+        {
+            throw std::system_error(
+                errno,
+                std::generic_category(),
+                "setsockopt"
+            );
+        }
     }
     if (::bind(
             listener.fd,
-            reinterpret_cast<const sockaddr*>(&address),
-            sizeof(address)
+            bind_address.data(),
+            bind_address.size()
         ) != 0)
     {
         throw std::system_error(
@@ -152,10 +152,11 @@ void TcpServer::start(const std::string& ipv4, std::uint16_t port)
             "listen"
         );
     }
-    socklen_t length = sizeof(address);
+    sockaddr_storage actual{};
+    socklen_t length = sizeof(actual);
     if (::getsockname(
             listener.fd,
-            reinterpret_cast<sockaddr*>(&address),
+            reinterpret_cast<sockaddr*>(&actual),
             &length
         ) != 0)
     {
@@ -167,7 +168,13 @@ void TcpServer::start(const std::string& ipv4, std::uint16_t port)
     }
 
     state.listener = listener.fd;
-    state.port = ntohs(address.sin_port);
+    state.port = actual.ss_family == AF_UNIX
+                     ? 0
+                     : Address(
+                           reinterpret_cast<const sockaddr*>(&actual),
+                           length
+                       )
+                           .port();
     state.running = true;
     try
     {

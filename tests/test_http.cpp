@@ -106,7 +106,24 @@ TEST(HttpTest, RejectsAmbiguousFramingAndOversizedBody)
     sylar::HttpSession second(oversized, 100, 8);
     EXPECT_THROW(second.readRequest(request), std::invalid_argument);
     MemoryStream chunked("POST / HTTP/1.1\r\nHost: x\r\n"
-                         "Transfer-Encoding: chunked\r\n\r\n");
+                         "Transfer-Encoding: chunked\r\n"
+                         "Content-Length: 1\r\n\r\nx");
     sylar::HttpSession third(chunked);
     EXPECT_THROW(third.readRequest(request), std::invalid_argument);
+}
+
+TEST(HttpTest, ParsesChunkedBodyAndNextRequest)
+{
+    MemoryStream stream("POST /chunks HTTP/1.1\r\nHost: test\r\n"
+                        "Transfer-Encoding: chunked\r\n\r\n"
+                        "5\r\nhello\r\n"
+                        "6\r\n world\r\n"
+                        "0\r\nX-Trailer: ok\r\n\r\n"
+                        "GET /next HTTP/1.1\r\nHost: test\r\n\r\n");
+    sylar::HttpSession session(stream);
+    sylar::HttpRequest request;
+    ASSERT_TRUE(session.readRequest(request));
+    EXPECT_EQ(request.body, "hello world");
+    ASSERT_TRUE(session.readRequest(request));
+    EXPECT_EQ(request.target, "/next");
 }

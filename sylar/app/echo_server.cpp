@@ -16,6 +16,7 @@
 #include <system_error>
 
 #include "net/TcpServer.hpp"
+#include "os/SignalFd.hpp"
 
 #include "config/Config.hpp"
 #include "config/LogLevelCodec.hpp"
@@ -169,53 +170,6 @@ void echoSession(
     }
 }
 
-class SignalFd
-{
-public:
-    SignalFd()
-    {
-        sigset_t mask;
-        ::sigemptyset(&mask);
-        ::sigaddset(&mask, SIGINT);
-        ::sigaddset(&mask, SIGTERM);
-        const int result = ::pthread_sigmask(
-            SIG_BLOCK,
-            &mask,
-            nullptr
-        );
-        if (result != 0)
-        {
-            throw std::system_error(
-                result,
-                std::generic_category(),
-                "pthread_sigmask"
-            );
-        }
-        m_fd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
-        if (m_fd < 0)
-        {
-            throw std::system_error(
-                errno,
-                std::generic_category(),
-                "signalfd"
-            );
-        }
-    }
-
-    ~SignalFd()
-    {
-        ::close(m_fd);
-    }
-
-    int get() const noexcept
-    {
-        return m_fd;
-    }
-
-private:
-    int m_fd = -1;
-};
-
 unsigned int parseNumber(std::string_view text)
 {
     unsigned int value = 0;
@@ -302,7 +256,7 @@ int main(int argc, char** argv)
         auto handler = [idle_timeout](sylar::IOManager& io, int fd)
         { echoSession(io, fd, idle_timeout); };
 
-        SignalFd signals;
+        sylar::SignalFd signals;
         sylar::IOManager io;
         std::unique_ptr<sylar::IOManagerPool> workers;
         std::unique_ptr<sylar::TcpServer> server;

@@ -274,3 +274,37 @@ TEST(TcpServerTest, IdleConnectionTimesOutAndCloses)
 }
 
 } // namespace
+
+TEST(TcpServerTest, ListensOnUnixAddress)
+{
+    sylar::IOManager io;
+    bool handled = false;
+    sylar::TcpServer server(
+        io,
+        [&](sylar::IOManager&, int fd)
+        {
+            char value = 0;
+            handled = ::recv(fd, &value, 1, 0) == 1 && value == 'x';
+            server.stop();
+        }
+    );
+    const auto path = "/tmp/sylar-unix-" +
+                      std::to_string(::getpid()) + ".sock";
+    ::unlink(path.c_str());
+    const auto address = sylar::Address::unix(path);
+    server.start(address);
+    EXPECT_EQ(server.localPort(), 0);
+
+    const int client = ::socket(
+        AF_UNIX,
+        SOCK_STREAM | SOCK_CLOEXEC,
+        0
+    );
+    ASSERT_GE(client, 0);
+    ASSERT_EQ(::connect(client, address.data(), address.size()), 0);
+    ASSERT_EQ(::send(client, "x", 1, MSG_NOSIGNAL), 1);
+    io.run();
+    ::close(client);
+    ::unlink(path.c_str());
+    EXPECT_TRUE(handled);
+}
