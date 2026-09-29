@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <charconv>
 #include <stdexcept>
 #include <utility>
@@ -20,7 +19,11 @@ std::string lower(std::string_view text)
         result.end(),
         result.begin(),
         [](unsigned char c)
-        { return static_cast<char>(std::tolower(c)); }
+        {
+            return static_cast<char>(
+                c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c
+            );
+        }
     );
     return result;
 }
@@ -63,7 +66,10 @@ bool validToken(std::string_view text)
     }
     for (unsigned char ch : text)
     {
-        if (!std::isalnum(ch) &&
+        const bool letter = (ch >= 'A' && ch <= 'Z') ||
+                            (ch >= 'a' && ch <= 'z');
+        const bool digit = ch >= '0' && ch <= '9';
+        if (!letter && !digit &&
             std::string_view("!#$%&'*+-.^_`|~").find(ch) ==
                 std::string_view::npos)
         {

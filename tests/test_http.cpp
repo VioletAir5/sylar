@@ -175,3 +175,12 @@ TEST(HttpTest, HeadAndNoContentResponsesHaveNoBody)
     );
     EXPECT_EQ(not_modified.find("payload"), std::string::npos);
 }
+
+TEST(HttpTest, RejectsNonAsciiHeaderNames)
+{
+    sylar::HttpRequest request;
+    MemoryStream stream("GET / HTTP/1.1\r\nHost: example\r\n"
+                        "X-\xC3\xA9: value\r\n\r\n");
+    sylar::HttpSession session(stream);
+    EXPECT_THROW(session.readRequest(request), std::invalid_argument);
+}
