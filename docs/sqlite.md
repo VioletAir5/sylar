@@ -9,7 +9,7 @@
 
 第二个命令重复执行时，`requests` 计数会继续增加。测试还覆盖内存数据库、类型化数据、异常 SQL、回滚与跨进程持久化。
 
-SQLite3 调用本身是同步的。高并发请求中可用 [BlockingExecutor](blocking_executor.md) 把查询移到专用线程，并在 Fiber 中等待结果；仍需控制同一连接上的事务并发。本模块尚未提供连接池。构建需要 SQLite3 开发包，例如 Ubuntu 的 `libsqlite3-dev`。
+SQLite3 调用本身是同步的。高并发请求中可用 [BlockingExecutor](blocking_executor.md) 把查询移到专用线程，并在 Fiber 中等待结果；仍需控制同一连接上的事务并发。`SqlitePool` 为文件数据库创建固定数量的独立连接；`acquire(timeout)` 返回独占 `SqliteLease`，析构时归还，耗尽后按指定超时等待。租约可用于 `SqliteRepository`，例如 `SqliteRepository<User, std::string> users(*lease, "users", &User::id, sqliteColumn("name", &User::name));`。连接池不支持 `:memory:`，因为各连接会看到不同的私有数据库。获取连接和 SQLite 查询都会阻塞调用线程，应在 `BlockingExecutor` 中使用；池内连接的写事务仍受 SQLite 写锁约束。构建需要 SQLite3 开发包，例如 Ubuntu 的 `libsqlite3-dev`。
 
 ## 轻量实体映射
 

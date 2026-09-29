@@ -15,4 +15,4 @@ io.schedule([&] {
 io.run();
 ```
 
-`await` 只能从该 `IOManager` 调度的 Fiber 调用。任务池析构时会等待已提交的任务完成；应在 `IOManager` 和被任务引用的对象仍存活时销毁。关闭 `IOManager` 会取消正在等待的 Fiber，但不能中断已开始执行的阻塞函数。SQLite 的同一连接即使启用互斥，也应由调用方协调事务范围；高吞吐数据库访问仍需要连接池或独立连接。
+`await` 只能从该 `IOManager` 调度的 Fiber 调用。任务池析构时会等待已提交的任务完成；应在 `IOManager` 和被任务引用的对象仍存活时销毁。关闭 `IOManager` 会取消正在等待的 Fiber，但不能中断已开始执行的阻塞函数。SQLite 的同一连接即使启用互斥，也应由调用方协调事务范围；高吞吐数据库访问可使用 [SqlitePool](sqlite.md) 为每个任务租借独立连接。
