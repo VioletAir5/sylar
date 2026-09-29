@@ -35,7 +35,7 @@ ctest --test-dir build --output-on-failure
 ./build/sylar/sqlite_demo
 ```
 
-默认构建核心框架，不要求安装 Redis、MySQL 或 ZooKeeper 开发包。[核心 CI](.github/workflows/core.yml) 在推送和 PR 时运行同样的 Release 构建与测试。需要对应扩展时在配置阶段加入 `-DSYLAR_WITH_REDIS=ON`、`-DSYLAR_WITH_MYSQL=ON`、`-DSYLAR_WITH_ZOOKEEPER=ON`；三个开关可分别启用。全部启用的 Release 构建通过 112 项测试，核心构建通过 109 项测试。若只构建示例而不运行测试，可加 `-DBUILD_TESTING=OFF`。
+默认构建核心框架，不要求安装 Redis、MySQL 或 ZooKeeper 开发包。[核心 CI](.github/workflows/core.yml) 在推送和 PR 时运行同样的 Release 构建与测试。需要对应扩展时在配置阶段加入 `-DSYLAR_WITH_REDIS=ON`、`-DSYLAR_WITH_MYSQL=ON`、`-DSYLAR_WITH_ZOOKEEPER=ON`；三个开关可分别启用。全部启用的 Release 构建通过 117 项测试，核心构建通过 114 项测试。若只构建示例而不运行测试，可加 `-DBUILD_TESTING=OFF`。
 
 也可以用 `./build/sylar/echo_server 9000 4` 指定端口与 I/O 工作线程数。按 Ctrl+C 或发送 SIGTERM 停止服务。示例配置见 [conf/echo.yml](conf/echo.yml)。HTTP 示例提供 /、/health 和 /echo，可用 `curl http://127.0.0.1:8080/health` 检查。HTTPS 可用 `http_server 8443 4 --tls cert.pem key.pem` 启动，客户端用 `http_client https://127.0.0.1:8443/health --ca cert.pem` 验证自签名证书；普通 CA 证书无需 `--ca`。
 
