@@ -193,7 +193,7 @@ TEST(HttpClientTest, DecodesChunkedResponse)
                                      "Connection: close\r\n\r\n"
                                      "5\r\nhello\r\n"
                                      "6\r\n world\r\n"
-                                     "0\r\n\r\n";
+                                     "0\r\nX-Checksum: yes\r\n\r\n";
             stream.writeAll(std::as_bytes(std::span(wire)));
         }
     );
@@ -388,4 +388,99 @@ TEST(HttpClientTest, ReadsFinalResponseAfterInformationalHeads)
     io.run();
     EXPECT_EQ(response.status, 200);
     EXPECT_EQ(response.body, "final");
+}
+
+TEST(HttpClientTest, RejectsInvalidRequestMetadataBeforeConnect)
+{
+    sylar::IOManager io;
+    const auto uri = sylar::Uri::parse("http://127.0.0.1:1/");
+    EXPECT_THROW(
+        sylar::HttpClient::request(
+            io,
+            uri,
+            std::string("GET") + '\0'
+        ),
+        std::invalid_argument
+    );
+    EXPECT_THROW(
+        sylar::HttpClient::request(
+            io,
+            uri,
+            "GET",
+            {},
+            {{"X-Test", std::string("bad") + '\0'}}
+        ),
+        std::invalid_argument
+    );
+}
+
+TEST(HttpClientTest, RejectsInvalidResponseHeader)
+{
+    sylar::IOManager io;
+    sylar::TcpServer server(
+        io,
+        [](sylar::IOManager& manager, int fd)
+        {
+            sylar::SocketStream stream(
+                manager,
+                sylar::Socket::borrow(fd)
+            );
+            const std::string
+                wire = std::string("HTTP/1.1 200 OK\r\nX-Test: bad") +
+                       '\0' + "\r\nContent-Length: 0\r\n\r\n";
+            stream.writeAll(std::as_bytes(std::span(wire)));
+        }
+    );
+    server.start("127.0.0.1", 0);
+    io.schedule(
+        [&]
+        {
+            const auto uri = sylar::Uri::parse(
+                "http://127.0.0.1:" +
+                std::to_string(server.localPort()) + "/"
+            );
+            EXPECT_THROW(
+                sylar::HttpClient::request(io, uri),
+                std::invalid_argument
+            );
+            server.stop();
+        }
+    );
+    io.run();
+}
+
+TEST(HttpClientTest, RejectsInvalidChunkedTrailer)
+{
+    sylar::IOManager io;
+    sylar::TcpServer server(
+        io,
+        [](sylar::IOManager& manager, int fd)
+        {
+            sylar::SocketStream stream(
+                manager,
+                sylar::Socket::borrow(fd)
+            );
+            const std::string
+                wire = "HTTP/1.1 200 OK\r\n"
+                       "Transfer-Encoding: chunked\r\n\r\n"
+                       "0\r\nBad Name: value\r\n\r\n";
+            stream.writeAll(std::as_bytes(std::span(wire)));
+        }
+    );
+    server.start("127.0.0.1", 0);
+    io.schedule(
+        [&]
+        {
+            const auto uri = sylar::Uri::parse(
+                "http://127.0.0.1:" +
+                std::to_string(server.localPort()) + "/"
+            );
+            EXPECT_THROW(
+                sylar::HttpClient::request(io, uri),
+                std::invalid_argument
+            );
+            server.stop();
+        }
+    );
+    io.run();
 }

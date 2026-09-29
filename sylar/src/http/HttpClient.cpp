@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <charconv>
 #include <cstddef>
 #include <memory>
@@ -28,9 +27,51 @@ std::string lower(std::string_view value)
         result.end(),
         result.begin(),
         [](unsigned char ch)
-        { return static_cast<char>(std::tolower(ch)); }
+        {
+            return static_cast<char>(
+                ch >= 'A' && ch <= 'Z' ? ch + ('a' - 'A') : ch
+            );
+        }
     );
     return result;
+}
+
+bool validToken(std::string_view text)
+{
+    return !text.empty() &&
+           std::all_of(
+               text.begin(),
+               text.end(),
+               [](unsigned char ch)
+               {
+                   const bool letter = (ch >= 'A' && ch <= 'Z') ||
+                                       (ch >= 'a' && ch <= 'z');
+                   const bool digit = ch >= '0' && ch <= '9';
+                   return letter || digit ||
+                          std::string_view("!#$%&'*+-.^_`|~")
+                                  .find(ch) != std::string_view::npos;
+               }
+           );
+}
+
+bool validFieldValue(std::string_view text)
+{
+    return std::all_of(
+        text.begin(),
+        text.end(),
+        [](unsigned char ch)
+        { return ch == '\t' || (ch >= ' ' && ch != 0x7f); }
+    );
+}
+
+bool validUriPart(std::string_view text)
+{
+    return !text.empty() &&
+           std::all_of(
+               text.begin(),
+               text.end(),
+               [](unsigned char ch) { return ch > ' ' && ch < 0x7f; }
+           );
 }
 
 class Reader
@@ -157,6 +198,11 @@ HttpResponse readResponse(
             throw std::invalid_argument("invalid HTTP status");
         }
         response.reason = status_line.substr(second + 1);
+        if (response.reason.empty() ||
+            !validFieldValue(response.reason))
+        {
+            throw std::invalid_argument("invalid HTTP reason");
+        }
         std::size_t header_bytes = status_line.size() + 2;
         while (true)
         {
@@ -171,7 +217,8 @@ HttpResponse readResponse(
                 break;
             }
             const auto colon = line.find(':');
-            if (colon == std::string::npos || colon == 0)
+            if (colon == std::string::npos ||
+                !validToken(std::string_view(line).substr(0, colon)))
             {
                 throw std::invalid_argument(
                     "invalid HTTP response header"
@@ -187,7 +234,8 @@ HttpResponse readResponse(
             const auto value = start == std::string::npos
                                    ? ""
                                    : line.substr(start);
-            if (response.headers.contains(name))
+            if (!validFieldValue(value) ||
+                response.headers.contains(name))
             {
                 throw std::invalid_argument(
                     "duplicate HTTP response header"
@@ -248,8 +296,32 @@ HttpResponse readResponse(
                 }
                 if (count == 0)
                 {
-                    while (!reader.line().empty())
+                    std::size_t trailer_bytes = 0;
+                    for (;;)
                     {
+                        const auto trailer = reader.line();
+                        trailer_bytes += trailer.size() + 2;
+                        if (trailer_bytes > 16 * 1024)
+                        {
+                            throw std::invalid_argument(
+                                "HTTP trailers too large"
+                            );
+                        }
+                        if (trailer.empty())
+                        {
+                            break;
+                        }
+                        const auto colon = trailer.find(':');
+                        if (colon == std::string::npos ||
+                            !validToken(std::string_view(trailer)
+                                            .substr(0, colon)) ||
+                            !validFieldValue(std::string_view(trailer)
+                                                 .substr(colon + 1)))
+                        {
+                            throw std::invalid_argument(
+                                "invalid HTTP trailer"
+                            );
+                        }
                     }
                     break;
                 }
@@ -305,10 +377,22 @@ HttpResponse HttpClient::request(
     {
         throw std::invalid_argument("unsupported HTTP URL scheme");
     }
-    if (method.empty() ||
-        method.find_first_of(" \t\r\n") != std::string::npos)
+    if (!validToken(method))
     {
         throw std::invalid_argument("invalid HTTP method");
+    }
+    if (!validUriPart(uri.host) || !validUriPart(uri.target) ||
+        uri.target.front() != '/')
+    {
+        throw std::invalid_argument("invalid HTTP URI");
+    }
+    for (const auto& [name, value] : headers)
+    {
+        if (!validToken(name) || !validFieldValue(value))
+        {
+            throw std::invalid_argument("invalid HTTP request header"
+            );
+        }
     }
     const auto addresses = Address::resolve(
         uri.host,
@@ -349,13 +433,6 @@ HttpResponse HttpClient::request(
                        "\r\n";
     for (const auto& [name, value] : headers)
     {
-        if (name.empty() ||
-            name.find_first_of(":\r\n") != std::string::npos ||
-            value.find_first_of("\r\n") != std::string::npos)
-        {
-            throw std::invalid_argument("invalid HTTP request header"
-            );
-        }
         const auto normalized = lower(name);
         if (normalized == "host" || normalized == "content-length" ||
             normalized == "connection" ||
