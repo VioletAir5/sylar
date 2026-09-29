@@ -340,3 +340,42 @@ TEST(HttpServerTest, HeadReturnsRepresentationLengthWithoutBody)
     EXPECT_EQ(response.body, "");
     EXPECT_EQ(response.headers.at("content-length"), "7");
 }
+
+TEST(HttpClientTest, ReadsFinalResponseAfterInformationalHeads)
+{
+    sylar::IOManager io;
+    sylar::TcpServer server(
+        io,
+        [](sylar::IOManager& manager, int fd)
+        {
+            sylar::SocketStream stream(
+                manager,
+                sylar::Socket::borrow(fd)
+            );
+            const std::string wire =
+                "HTTP/1.1 103 Early Hints\r\n"
+                "Link: </style.css>; rel=preload\r\n\r\n"
+                "HTTP/1.1 100 Continue\r\n\r\n"
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Length: 5\r\nConnection: close\r\n\r\n"
+                "final";
+            stream.writeAll(std::as_bytes(std::span(wire)));
+        }
+    );
+    server.start("127.0.0.1", 0);
+    sylar::HttpResponse response;
+    io.schedule(
+        [&]
+        {
+            const auto uri = sylar::Uri::parse(
+                "http://127.0.0.1:" +
+                std::to_string(server.localPort()) + "/"
+            );
+            response = sylar::HttpClient::request(io, uri);
+            server.stop();
+        }
+    );
+    io.run();
+    EXPECT_EQ(response.status, 200);
+    EXPECT_EQ(response.body, "final");
+}

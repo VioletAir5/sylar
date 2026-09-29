@@ -126,144 +126,167 @@ HttpResponse readResponse(
 )
 {
     Reader reader(stream);
-    auto status_line = reader.line();
-    const auto first = status_line.find(' ');
-    const auto second = status_line.find(' ', first + 1);
-    if (first == std::string::npos || second == std::string::npos ||
-        (status_line.substr(0, first) != "HTTP/1.1" &&
-         status_line.substr(0, first) != "HTTP/1.0"))
+    int informational = 0;
+    for (;;)
     {
-        throw std::invalid_argument("invalid HTTP response line");
-    }
-    HttpResponse response;
-    const auto status_text = std::string_view(status_line)
-                                 .substr(
-                                     first + 1,
-                                     second - first - 1
-                                 );
-    const auto [end, error] = std::from_chars(
-        status_text.data(),
-        status_text.data() + status_text.size(),
-        response.status
-    );
-    if (error != std::errc{} ||
-        end != status_text.data() + status_text.size() ||
-        response.status < 100 || response.status > 999)
-    {
-        throw std::invalid_argument("invalid HTTP status");
-    }
-    response.reason = status_line.substr(second + 1);
-    std::size_t header_bytes = status_line.size() + 2;
-    while (true)
-    {
-        auto line = reader.line();
-        header_bytes += line.size() + 2;
-        if (header_bytes > 16 * 1024)
+        auto status_line = reader.line();
+        const auto first = status_line.find(' ');
+        const auto second = status_line.find(' ', first + 1);
+        if (first == std::string::npos ||
+            second == std::string::npos ||
+            (status_line.substr(0, first) != "HTTP/1.1" &&
+             status_line.substr(0, first) != "HTTP/1.0"))
         {
-            throw std::invalid_argument("HTTP headers too large");
+            throw std::invalid_argument("invalid HTTP response line");
         }
-        if (line.empty())
-        {
-            break;
-        }
-        const auto colon = line.find(':');
-        if (colon == std::string::npos || colon == 0)
-        {
-            throw std::invalid_argument("invalid HTTP response header"
-            );
-        }
-        const auto name = lower(
-            std::string_view(line).substr(0, colon)
+        HttpResponse response;
+        const auto status_text = std::string_view(status_line)
+                                     .substr(
+                                         first + 1,
+                                         second - first - 1
+                                     );
+        const auto [end, error] = std::from_chars(
+            status_text.data(),
+            status_text.data() + status_text.size(),
+            response.status
         );
-        const auto start = line.find_first_not_of(" \t", colon + 1);
-        const auto value = start == std::string::npos
-                               ? ""
-                               : line.substr(start);
-        if (response.headers.contains(name))
+        if (error != std::errc{} ||
+            end != status_text.data() + status_text.size() ||
+            response.status < 100 || response.status > 999)
         {
-            throw std::invalid_argument(
-                "duplicate HTTP response header"
-            );
+            throw std::invalid_argument("invalid HTTP status");
         }
-        response.headers.emplace(name, value);
-    }
-    if (method == "HEAD" ||
-        (response.status >= 100 && response.status < 200) ||
-        response.status == 204 || response.status == 304)
-    {
-        return response;
-    }
-    const auto transfer = response.headers.find("transfer-encoding");
-    const auto length = response.headers.find("content-length");
-    if (transfer != response.headers.end())
-    {
-        if (length != response.headers.end() ||
-            lower(transfer->second) != "chunked")
-        {
-            throw std::invalid_argument(
-                "unsupported HTTP transfer encoding"
-            );
-        }
+        response.reason = status_line.substr(second + 1);
+        std::size_t header_bytes = status_line.size() + 2;
         while (true)
         {
-            const auto line = reader.line();
-            const auto semicolon = line.find(';');
-            const auto hex = std::string_view(line).substr(
-                0,
-                semicolon
-            );
-            std::size_t count = 0;
-            const auto [last, parse_error] = std::from_chars(
-                hex.data(),
-                hex.data() + hex.size(),
-                count,
-                16
-            );
-            if (parse_error != std::errc{} ||
-                last != hex.data() + hex.size() ||
-                count > max_body - response.body.size())
+            auto line = reader.line();
+            header_bytes += line.size() + 2;
+            if (header_bytes > 16 * 1024)
             {
-                throw std::invalid_argument("invalid HTTP chunk size"
-                );
+                throw std::invalid_argument("HTTP headers too large");
             }
-            if (count == 0)
+            if (line.empty())
             {
-                while (!reader.line().empty())
-                {
-                }
                 break;
             }
-            response.body += reader.take(count);
-            if (reader.take(2) != "\r\n")
+            const auto colon = line.find(':');
+            if (colon == std::string::npos || colon == 0)
             {
                 throw std::invalid_argument(
-                    "invalid HTTP chunk terminator"
+                    "invalid HTTP response header"
                 );
             }
-        }
-    }
-    else if (length != response.headers.end())
-    {
-        std::size_t count = 0;
-        const auto [last, parse_error] = std::from_chars(
-            length->second.data(),
-            length->second.data() + length->second.size(),
-            count
-        );
-        if (parse_error != std::errc{} ||
-            last != length->second.data() + length->second.size() ||
-            count > max_body)
-        {
-            throw std::invalid_argument("invalid HTTP Content-Length"
+            const auto name = lower(
+                std::string_view(line).substr(0, colon)
             );
+            const auto start = line.find_first_not_of(
+                " \t",
+                colon + 1
+            );
+            const auto value = start == std::string::npos
+                                   ? ""
+                                   : line.substr(start);
+            if (response.headers.contains(name))
+            {
+                throw std::invalid_argument(
+                    "duplicate HTTP response header"
+                );
+            }
+            response.headers.emplace(name, value);
         }
-        response.body = reader.take(count);
+        if (response.status >= 100 && response.status < 200)
+        {
+            if (response.status == 101 || ++informational > 8)
+            {
+                throw std::invalid_argument(
+                    "unsupported HTTP informational response"
+                );
+            }
+            continue;
+        }
+        if (method == "HEAD" || response.status == 204 ||
+            response.status == 304)
+        {
+            return response;
+        }
+        const auto transfer = response.headers.find(
+            "transfer-encoding"
+        );
+        const auto length = response.headers.find("content-length");
+        if (transfer != response.headers.end())
+        {
+            if (length != response.headers.end() ||
+                lower(transfer->second) != "chunked")
+            {
+                throw std::invalid_argument(
+                    "unsupported HTTP transfer encoding"
+                );
+            }
+            while (true)
+            {
+                const auto line = reader.line();
+                const auto semicolon = line.find(';');
+                const auto hex = std::string_view(line).substr(
+                    0,
+                    semicolon
+                );
+                std::size_t count = 0;
+                const auto [last, parse_error] = std::from_chars(
+                    hex.data(),
+                    hex.data() + hex.size(),
+                    count,
+                    16
+                );
+                if (parse_error != std::errc{} ||
+                    last != hex.data() + hex.size() ||
+                    count > max_body - response.body.size())
+                {
+                    throw std::invalid_argument(
+                        "invalid HTTP chunk size"
+                    );
+                }
+                if (count == 0)
+                {
+                    while (!reader.line().empty())
+                    {
+                    }
+                    break;
+                }
+                response.body += reader.take(count);
+                if (reader.take(2) != "\r\n")
+                {
+                    throw std::invalid_argument(
+                        "invalid HTTP chunk terminator"
+                    );
+                }
+            }
+        }
+        else if (length != response.headers.end())
+        {
+            std::size_t count = 0;
+            const auto [last, parse_error] = std::from_chars(
+                length->second.data(),
+                length->second.data() + length->second.size(),
+                count
+            );
+            if (parse_error != std::errc{} ||
+                last !=
+                    length->second.data() + length->second.size() ||
+                count > max_body)
+            {
+                throw std::invalid_argument(
+                    "invalid HTTP Content-Length"
+                );
+            }
+            response.body = reader.take(count);
+        }
+        else
+        {
+            response.body = reader.rest(max_body);
+        }
+        return response;
     }
-    else
-    {
-        response.body = reader.rest(max_body);
-    }
-    return response;
 }
 
 } // namespace
