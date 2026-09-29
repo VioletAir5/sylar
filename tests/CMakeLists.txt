@@ -46,13 +46,15 @@ if(OPENSSL_EXECUTABLE)
     set_tests_properties(HttpsApp.VerificationAndShutdown PROPERTIES TIMEOUT 20)
 endif()
 
-add_test(
-    NAME WebSocketApp.ProtocolAndShutdown
-    COMMAND Python3::Interpreter
-        "${CMAKE_CURRENT_SOURCE_DIR}/test_websocket_app.py"
-        $<TARGET_FILE:ws_echo_server>
-)
-set_tests_properties(WebSocketApp.ProtocolAndShutdown PROPERTIES TIMEOUT 20)
+if(OPENSSL_EXECUTABLE)
+    add_test(
+        NAME WebSocketApp.ProtocolAndShutdown
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_websocket_app.py"
+            $<TARGET_FILE:ws_echo_server>
+    )
+    set_tests_properties(WebSocketApp.ProtocolAndShutdown PROPERTIES TIMEOUT 20)
+endif()
 
 if(OPENSSL_EXECUTABLE)
     add_test(
@@ -73,34 +75,47 @@ add_test(
 )
 set_tests_properties(SqliteApp.PersistsAcrossProcesses PROPERTIES TIMEOUT 10)
 
-add_test(
-    NAME SmtpApp.PlainTlsStartTlsAndReject
-    COMMAND Python3::Interpreter
-        "${CMAKE_CURRENT_SOURCE_DIR}/test_smtp_app.py"
-        $<TARGET_FILE:smtp_demo>
-)
-set_tests_properties(SmtpApp.PlainTlsStartTlsAndReject PROPERTIES TIMEOUT 20)
+if(OPENSSL_EXECUTABLE)
+    add_test(
+        NAME SmtpApp.PlainTlsStartTlsAndReject
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_smtp_app.py"
+            $<TARGET_FILE:smtp_demo>
+    )
+    set_tests_properties(SmtpApp.PlainTlsStartTlsAndReject PROPERTIES TIMEOUT 20)
+endif()
 
-add_test(
-    NAME RedisApp.TypedRepliesAndShutdown
-    COMMAND Python3::Interpreter
-        "${CMAKE_CURRENT_SOURCE_DIR}/test_redis_app.py"
-        $<TARGET_FILE:redis_demo>
-)
-set_tests_properties(RedisApp.TypedRepliesAndShutdown PROPERTIES TIMEOUT 20)
+find_program(REDIS_SERVER_EXECUTABLE redis-server)
+if(SYLAR_WITH_REDIS AND REDIS_SERVER_EXECUTABLE)
+    add_test(
+        NAME RedisApp.TypedRepliesAndShutdown
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_redis_app.py"
+            $<TARGET_FILE:redis_demo>
+    )
+    set_tests_properties(RedisApp.TypedRepliesAndShutdown PROPERTIES TIMEOUT 20)
+endif()
 
-add_test(
-    NAME MySqlApp.PreparedQueryAndShutdown
-    COMMAND Python3::Interpreter
-        "${CMAKE_CURRENT_SOURCE_DIR}/test_mysql_app.py"
-        $<TARGET_FILE:mysql_demo>
-)
-set_tests_properties(MySqlApp.PreparedQueryAndShutdown PROPERTIES TIMEOUT 60)
+find_program(MYSQLD_EXECUTABLE mysqld)
+find_program(MYSQLADMIN_EXECUTABLE mysqladmin)
+if(SYLAR_WITH_MYSQL AND MYSQLD_EXECUTABLE AND MYSQLADMIN_EXECUTABLE)
+    add_test(
+        NAME MySqlApp.PreparedQueryAndShutdown
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_mysql_app.py"
+            $<TARGET_FILE:mysql_demo>
+    )
+    set_tests_properties(MySqlApp.PreparedQueryAndShutdown PROPERTIES TIMEOUT 60)
+endif()
 
-add_test(
-    NAME ZooKeeperApp.NodesAndShutdown
-    COMMAND Python3::Interpreter
-        "${CMAKE_CURRENT_SOURCE_DIR}/test_zk_app.py"
-        $<TARGET_FILE:zk_demo>
-)
-set_tests_properties(ZooKeeperApp.NodesAndShutdown PROPERTIES TIMEOUT 30)
+find_program(JAVA_EXECUTABLE java)
+if(SYLAR_WITH_ZOOKEEPER AND JAVA_EXECUTABLE AND
+   EXISTS "/usr/share/zookeeper/bin/zkServer.sh")
+    add_test(
+        NAME ZooKeeperApp.NodesAndShutdown
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_zk_app.py"
+            $<TARGET_FILE:zk_demo>
+    )
+    set_tests_properties(ZooKeeperApp.NodesAndShutdown PROPERTIES TIMEOUT 30)
+endif()

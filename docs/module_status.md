@@ -1,6 +1,6 @@
 # 模块状态
 
-以 [上游 sylar README](https://github.com/sylar-yin/sylar) 的 13 个教程模块为基础对照。这里的“已实现”表示本仓库有可用接口及对应测试；不表示与上游 API 完全兼容。
+以 [上游 sylar README](https://github.com/sylar-yin/sylar) 的 13 个教程模块为基础对照。Redis、MySQL 和 ZooKeeper 默认不构建，可用同名 `SYLAR_WITH_*` CMake 选项分别开启。这里的“已实现”表示本仓库有可用接口及对应测试；不表示与上游 API 完全兼容。
 
 | 模块 | 状态 | 本仓库实现 |
 | --- | --- | --- |

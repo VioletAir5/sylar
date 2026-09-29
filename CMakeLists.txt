@@ -9,6 +9,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CTest)
 
+option(SYLAR_WITH_REDIS "Build the hiredis adapter and demo" OFF)
+option(SYLAR_WITH_MYSQL "Build the MySQL adapter and demo" OFF)
+option(SYLAR_WITH_ZOOKEEPER "Build the ZooKeeper adapter and demo" OFF)
+
 add_subdirectory(sylar)
 
 if(BUILD_TESTING)

@@ -7,3 +7,5 @@ RedisClient 使用 hiredis 管理连接，command 接受 string_view 参数列�
 集成测试启动临时、仅绑定本机且不持久化的 Redis 实例，验证各类应答后关闭实例，不依赖常驻服务。
 
 hiredis 接口是同步阻塞的。应在 BlockingExecutor 中创建并使用连接，避免阻塞 IOManager 线程；一个连接上的命令应串行调用。本模块尚无连接池、TLS、认证配置或自动重连。构建需要 hiredis 开发包，集成测试需要 redis-server。
+
+构建该适配器时设置 `-DSYLAR_WITH_REDIS=ON`；默认核心构建不包含此适配器。
