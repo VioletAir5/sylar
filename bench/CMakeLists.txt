@@ -22,3 +22,8 @@ add_executable(sylar_echo_bench bench_echo.cpp)
 target_compile_options(sylar_echo_bench PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
 )
+
+add_executable(sylar_http_bench bench_http.cpp)
+target_compile_options(sylar_http_bench PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)

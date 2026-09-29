@@ -71,6 +71,35 @@ async def benchmark(args):
         line = await asyncio.wait_for(server.stdout.readline(), 3)
         if str(port).encode() not in line:
             raise RuntimeError(f"server failed to start: {line!r}")
+        if args.native_client:
+            before_cpu = cpu_seconds(server.pid)
+            runner = await asyncio.create_subprocess_exec(
+                args.native_client, str(port), str(args.clients),
+                str(args.requests),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    runner.communicate(), args.timeout
+                )
+            except asyncio.TimeoutError:
+                runner.kill()
+                await runner.wait()
+                raise
+            if runner.returncode != 0:
+                raise RuntimeError(
+                    f"native HTTP benchmark failed: {stderr.decode()}"
+                )
+            after_cpu = cpu_seconds(server.pid)
+            peak = peak_kib(server.pid)
+            print(
+                f"workers={args.workers} "
+                f"server_cpu_s={after_cpu - before_cpu:.3f} "
+                f"server_vmhwm_kib={peak}"
+            )
+            print(stdout.decode().strip())
+            return
         connections = await asyncio.wait_for(
             asyncio.gather(*[
                 asyncio.open_connection("127.0.0.1", port)
@@ -121,6 +150,7 @@ def main():
     parser.add_argument("--clients", type=int, default=100)
     parser.add_argument("--requests", type=int, default=100)
     parser.add_argument("--timeout", type=float, default=60)
+    parser.add_argument("--native-client")
     args = parser.parse_args()
     if (args.workers < 1 or args.clients < 1 or
             args.requests < 1 or args.clients > 2000):
