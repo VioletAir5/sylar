@@ -126,6 +126,16 @@ TEST(UriTest, ParsesAuthorityAndTarget)
         sylar::Uri::parse("http://host:99999/"),
         std::invalid_argument
     );
+    EXPECT_THROW(
+        sylar::Uri::parse(
+            std::string("http://host/") + '\0' + "path"
+        ),
+        std::invalid_argument
+    );
+    EXPECT_THROW(
+        sylar::Uri::parse(std::string("http://ho") + '\0' + "st/"),
+        std::invalid_argument
+    );
 }
 
 TEST(HttpClientTest, RequestsLocalServlet)

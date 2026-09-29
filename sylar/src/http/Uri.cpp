@@ -1,5 +1,6 @@
 #include "http/Uri.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <stdexcept>
 
@@ -65,7 +66,11 @@ Uri Uri::parse(std::string_view text)
         }
     }
     if (result.host.empty() ||
-        result.host.find_first_of(" \t\r\n") != std::string::npos)
+        std::any_of(
+            result.host.begin(),
+            result.host.end(),
+            [](unsigned char ch) { return ch <= ' ' || ch >= 0x7f; }
+        ))
     {
         throw std::invalid_argument("invalid URL host");
     }
@@ -114,7 +119,11 @@ Uri Uri::parse(std::string_view text)
     {
         throw std::invalid_argument("invalid URL target");
     }
-    if (result.target.find_first_of(" \t\r\n") != std::string::npos)
+    if (std::any_of(
+            result.target.begin(),
+            result.target.end(),
+            [](unsigned char ch) { return ch <= ' ' || ch >= 0x7f; }
+        ))
     {
         throw std::invalid_argument("invalid URL target");
     }

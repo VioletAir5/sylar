@@ -32,7 +32,7 @@ python3 bench/http_benchmark.py \
 # 将 --workers 改成 4，分别重复三次
 ```
 
-2026-09-29 在同一台 WSL2 Ubuntu 主机测得：Linux 6.18.33.2-microsoft-standard-WSL2、AMD Ryzen 7 8845H（分配 16 个逻辑 CPU）、GCC 13.1.0、Release 构建。每轮 100 个连接、每连接 1000 次请求，共 10 万次；压测端与服务端共享 CPU。以下为三轮吞吐的中位数，括号为范围；延迟和资源列取中位吞吐对应的一轮。没有预热。
+2026-09-29 基于提交 `987f70f` 在同一台 WSL2 Ubuntu 主机测得：Linux 6.18.33.2-microsoft-standard-WSL2、AMD Ryzen 7 8845H（分配 16 个逻辑 CPU）、GCC 13.1.0、Release 构建。每轮 100 个连接、每连接 1000 次请求，共 10 万次；压测端与服务端共享 CPU。以下为三轮吞吐的中位数，括号为范围；延迟和资源列取中位吞吐对应的一轮。没有预热。
 
 | 工作线程 | 吞吐中位数（范围） | p50 | p99 | 服务端 CPU | VmHWM |
 | ---: | ---: | ---: | ---: | ---: | ---: |
