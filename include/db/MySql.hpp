@@ -57,4 +57,20 @@ private:
     std::unique_ptr<Impl> m_impl;
 };
 
+class MySqlTransaction
+{
+public:
+    explicit MySqlTransaction(MySqlClient& client);
+    ~MySqlTransaction() noexcept;
+    MySqlTransaction(const MySqlTransaction&) = delete;
+    MySqlTransaction& operator=(const MySqlTransaction&) = delete;
+
+    void commit();
+    void rollback();
+
+private:
+    MySqlClient& m_client;
+    bool m_active = true;
+};
+
 } // namespace sylar

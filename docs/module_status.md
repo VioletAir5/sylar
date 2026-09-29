@@ -18,7 +18,7 @@
 | HTTP | 部分 | HTTP/1.1 服务端、客户端、keep-alive、chunked、TLS、HEAD 和无内容响应边界；已有初步 HTTP 基准，仍需完善协议边界与性能 |
 | Servlet | 已实现 | 精确和前缀路由、FunctionServlet、404 回退 |
 
-上游仓库简介还提到 WebSocket、HTTPS、SMTP、MySQL、SQLite3、ORM、Redis、ZooKeeper 等扩展。其中 HTTPS 已有证书验证的客户端与服务端，WebSocket 已有 ws/wss 服务端与客户端、HTTP 同端口升级、帧解析与回显测试；SQLite3 已有预编译语句、事务与持久化测试。SMTP 已有明文、隐式 TLS 与 STARTTLS 客户端及本地协议测试；Redis 已有本地实例测试；MySQL 已有预编译参数和隔离实例测试；ZooKeeper 已有基础 znode API 与隔离实例测试；ORM 已有 SQLite 单表实体映射、CRUD、连接池和边界测试；尚无关系映射。跨模块改动按协议基础、Hook 与生命周期、扩展协议、外部服务适配的顺序推进。
+上游仓库简介还提到 WebSocket、HTTPS、SMTP、MySQL、SQLite3、ORM、Redis、ZooKeeper 等扩展。其中 HTTPS 已有证书验证的客户端与服务端，WebSocket 已有 ws/wss 服务端与客户端、HTTP 同端口升级、帧解析与回显测试；SQLite3 已有预编译语句、事务与持久化测试。SMTP 已有明文、隐式 TLS 与 STARTTLS 客户端及本地协议测试；Redis 已有本地实例测试；MySQL 已有预编译参数、RAII 事务和隔离实例测试；ZooKeeper 已有基础 znode API 与隔离实例测试；ORM 已有 SQLite 单表实体映射、CRUD、连接池和边界测试；尚无关系映射。跨模块改动按协议基础、Hook 与生命周期、扩展协议、外部服务适配的顺序推进。
 
 ## 验收原则
 

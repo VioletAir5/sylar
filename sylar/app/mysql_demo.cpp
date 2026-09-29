@@ -80,6 +80,57 @@ int main(int argc, char** argv)
                             throw std::runtime_error("MySQL count "
                                                      "mismatch");
                         }
+                        {
+                            sylar::MySqlTransaction transaction(mysql
+                            );
+                            mysql.execute(
+                                "INSERT INTO item(id, payload) "
+                                "VALUES(2, 'rollback')"
+                            );
+                        }
+                        if (!mysql
+                                 .query("SELECT id FROM item WHERE "
+                                        "id = 2")
+                                 .empty())
+                        {
+                            throw std::runtime_error(
+                                "MySQL rollback failed"
+                            );
+                        }
+                        {
+                            sylar::MySqlTransaction transaction(mysql
+                            );
+                            mysql.execute(
+                                "INSERT INTO item(id, payload) "
+                                "VALUES(3, 'commit')"
+                            );
+                            transaction.commit();
+                            bool double_commit_rejected = false;
+                            try
+                            {
+                                transaction.commit();
+                            }
+                            catch (const std::logic_error&)
+                            {
+                                double_commit_rejected = true;
+                            }
+                            if (!double_commit_rejected)
+                            {
+                                throw std::runtime_error(
+                                    "MySQL double commit accepted"
+                                );
+                            }
+                        }
+                        if (mysql
+                                .query(
+                                    "SELECT id FROM item WHERE id = 3"
+                                )
+                                .size() != 1)
+                        {
+                            throw std::runtime_error(
+                                "MySQL commit failed"
+                            );
+                        }
                         bool rejected = false;
                         try
                         {

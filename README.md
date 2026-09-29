@@ -11,7 +11,7 @@
 - **网络与序列化**：IPv4、IPv6、Unix 地址；TCP/UDP RAII Socket、Stream 与 ByteArray。
 - **TCP 服务**：IPv4、IPv6、Unix 多地址非阻塞监听、连接分派、可配置空闲超时、SIGINT/SIGTERM 停机。
 - **ZooKeeper**：会话连接与 znode CRUD、子节点查询；见 [ZooKeeper 文档](docs/zookeeper.md)。
-- **MySQL**：预编译读写、二进制参数与本地隔离实例测试；见 [MySQL 文档](docs/mysql.md)。
+- **MySQL**：预编译读写、二进制参数、RAII 事务与本地隔离实例测试；见 [MySQL 文档](docs/mysql.md)。
 - **Redis**：二进制安全命令、类型化应答与本地实例测试；通过阻塞任务池使用，见 [Redis 文档](docs/redis.md)。
 - **SMTP**：SMTP 客户端、收件人应答校验、DATA 转义、隐式 TLS 与 STARTTLS；见 [SMTP 文档](docs/smtp.md)。
 - **SQLite3**：RAII 连接、固定大小连接池、预编译语句、事务与轻量单表 ORM；同步调用约束见 [SQLite 文档](docs/sqlite.md)。

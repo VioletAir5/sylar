@@ -6,6 +6,6 @@ MySqlClient 使用 MySQL 8 C API 管理连接，支持 Unix socket 和 TCP，提
 
     ./build/sylar/mysql_demo /path/to/mysql.sock
 
-集成测试初始化临时数据目录，启动仅用 Unix socket 的 MySQL 8 实例，验证预编译写入、读取与异常路径，然后关闭并清理实例。它不会使用本机现有数据库目录。
+集成测试初始化临时数据目录，启动仅用 Unix socket 的 MySQL 8 实例，验证预编译写入、读取、事务提交与回滚及异常路径，然后关闭并清理实例。它不会使用本机现有数据库目录。
 
-MySQL C API 调用是同步的；在 IOManager 中应通过 BlockingExecutor 执行。当前没有连接池、事务 RAII、自动重连或 TLS 连接配置。构建需要 mysqlclient 开发包；运行集成测试还需要 mysqld 与 mysqladmin。预编译语句绑定方式参考 [MySQL 8 C API 文档](https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-bind-param.html)。
+`MySqlTransaction` 在构造时开始事务，调用 `commit()` 提交，未提交时析构尝试回滚。事务对象和连接都必须留在同一阻塞任务的使用范围内；不支持在同一连接上嵌套事务。MySQL C API 调用是同步的；在 IOManager 中应通过 BlockingExecutor 执行。当前没有连接池、自动重连或 TLS 连接配置。构建需要 mysqlclient 开发包；运行集成测试还需要 mysqld 与 mysqladmin。预编译语句绑定方式参考 [MySQL 8 C API 文档](https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-bind-param.html)。

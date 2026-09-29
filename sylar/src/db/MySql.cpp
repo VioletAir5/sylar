@@ -455,4 +455,45 @@ MySqlRows MySqlClient::queryPrepared(
     return copyPreparedRows(statement.get());
 }
 
+MySqlTransaction::MySqlTransaction(MySqlClient& client)
+    : m_client(client)
+{
+    m_client.execute("START TRANSACTION");
+}
+
+MySqlTransaction::~MySqlTransaction() noexcept
+{
+    if (m_active)
+    {
+        try
+        {
+            m_client.execute("ROLLBACK");
+        }
+        catch (...)
+        {
+            // Destructors cannot report a failed rollback.
+        }
+    }
+}
+
+void MySqlTransaction::commit()
+{
+    if (!m_active)
+    {
+        throw std::logic_error("MySQL transaction already finished");
+    }
+    m_client.execute("COMMIT");
+    m_active = false;
+}
+
+void MySqlTransaction::rollback()
+{
+    if (!m_active)
+    {
+        throw std::logic_error("MySQL transaction already finished");
+    }
+    m_client.execute("ROLLBACK");
+    m_active = false;
+}
+
 } // namespace sylar
