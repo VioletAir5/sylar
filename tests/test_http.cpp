@@ -127,3 +127,51 @@ TEST(HttpTest, ParsesChunkedBodyAndNextRequest)
     ASSERT_TRUE(session.readRequest(request));
     EXPECT_EQ(request.target, "/next");
 }
+
+TEST(HttpTest, ConnectionTokensAndEmptyHost)
+{
+    MemoryStream stream(
+        "GET / HTTP/1.1\r\nHost: example\r\n"
+        "Connection: keep-alive, CLOSE\r\n\r\n"
+        "GET / HTTP/1.0\r\nConnection: Upgrade, Keep-Alive\r\n\r\n"
+    );
+    sylar::HttpSession session(stream);
+    sylar::HttpRequest request;
+    ASSERT_TRUE(session.readRequest(request));
+    EXPECT_FALSE(request.keepAlive());
+    ASSERT_TRUE(session.readRequest(request));
+    EXPECT_TRUE(request.keepAlive());
+
+    MemoryStream bad("GET / HTTP/1.1\r\nHost: \r\n\r\n");
+    sylar::HttpSession bad_session(bad);
+    EXPECT_THROW(
+        bad_session.readRequest(request),
+        std::invalid_argument
+    );
+}
+
+TEST(HttpTest, HeadAndNoContentResponsesHaveNoBody)
+{
+    sylar::HttpResponse response;
+    response.body = "payload";
+    const auto head = response.serialize(true, true);
+    EXPECT_NE(head.find("Content-Length: 7\r\n"), std::string::npos);
+    EXPECT_EQ(head.substr(head.size() - 4), "\r\n\r\n");
+    EXPECT_EQ(head.find("payload"), std::string::npos);
+
+    response.status = 204;
+    response.reason = "No Content";
+    const auto no_content = response.serialize();
+    EXPECT_EQ(no_content.find("Content-Length:"), std::string::npos);
+    EXPECT_EQ(no_content.find("payload"), std::string::npos);
+    EXPECT_EQ(no_content.substr(no_content.size() - 4), "\r\n\r\n");
+
+    response.status = 304;
+    response.reason = "Not Modified";
+    const auto not_modified = response.serialize();
+    EXPECT_EQ(
+        not_modified.find("Content-Length:"),
+        std::string::npos
+    );
+    EXPECT_EQ(not_modified.find("payload"), std::string::npos);
+}

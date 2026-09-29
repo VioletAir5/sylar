@@ -173,7 +173,11 @@ TcpServer::Handler makeHandler(
                     response.reason = "Internal Server Error";
                     response.body = "500 Internal Server Error\n";
                 }
-                session.sendResponse(response, keep_alive);
+                session.sendResponse(
+                    response,
+                    keep_alive,
+                    request.method == "HEAD"
+                );
                 if (!keep_alive)
                 {
                     return;

@@ -31,7 +31,8 @@ struct HttpResponse
     std::unordered_map<std::string, std::string> headers;
     std::string body;
 
-    std::string serialize(bool keep_alive = true) const;
+    std::string
+    serialize(bool keep_alive = true, bool head_only = false) const;
 };
 
 class HttpSession
@@ -45,7 +46,11 @@ public:
 
     // false means a clean EOF before the next request.
     bool readRequest(HttpRequest& request);
-    void sendResponse(const HttpResponse& response, bool keep_alive);
+    void sendResponse(
+        const HttpResponse& response,
+        bool keep_alive,
+        bool head_only = false
+    );
     std::string takeBuffered();
 
 private:

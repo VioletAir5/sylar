@@ -305,3 +305,38 @@ TEST(HttpServerTest, UpgradesWebSocketAndKeepsHttpRouteOnSamePort)
     EXPECT_EQ(http_response.status, 200);
     EXPECT_EQ(http_response.body, "ok");
 }
+
+TEST(HttpServerTest, HeadReturnsRepresentationLengthWithoutBody)
+{
+    sylar::IOManager io;
+    auto routes = std::make_shared<sylar::ServletDispatch>();
+    routes->addExact(
+        "/resource",
+        std::make_shared<sylar::FunctionServlet>(
+            [](const sylar::HttpRequest&)
+            {
+                sylar::HttpResponse response;
+                response.body = "content";
+                return response;
+            }
+        )
+    );
+    sylar::HttpServer server(io, routes);
+    server.start("127.0.0.1", 0);
+    sylar::HttpResponse response;
+    io.schedule(
+        [&]
+        {
+            const auto uri = sylar::Uri::parse(
+                "http://127.0.0.1:" +
+                std::to_string(server.localPort()) + "/resource"
+            );
+            response = sylar::HttpClient::request(io, uri, "HEAD");
+            server.stop();
+        }
+    );
+    io.run();
+    EXPECT_EQ(response.status, 200);
+    EXPECT_EQ(response.body, "");
+    EXPECT_EQ(response.headers.at("content-length"), "7");
+}

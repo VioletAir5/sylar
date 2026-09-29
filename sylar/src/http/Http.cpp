@@ -36,6 +36,25 @@ std::string_view trim(std::string_view text)
     return text.substr(first, last - first + 1);
 }
 
+bool hasToken(std::string_view value, std::string_view expected)
+{
+    while (!value.empty())
+    {
+        const auto comma = value.find(',');
+        const auto token = trim(value.substr(0, comma));
+        if (lower(token) == expected)
+        {
+            return true;
+        }
+        if (comma == std::string_view::npos)
+        {
+            break;
+        }
+        value.remove_prefix(comma + 1);
+    }
+    return false;
+}
+
 bool validToken(std::string_view text)
 {
     if (text.empty())
@@ -112,7 +131,8 @@ void parseHead(std::string_view head, HttpRequest& request)
         offset = end + 2;
     }
     if (request.version == "HTTP/1.1" &&
-        !request.headers.contains("host"))
+        (!request.headers.contains("host") ||
+         request.headers.at("host").empty()))
     {
         throw std::invalid_argument("HTTP/1.1 requires Host");
     }
@@ -166,15 +186,16 @@ HttpRequest::header(std::string_view name) const
 bool HttpRequest::keepAlive() const
 {
     const auto value = header("connection");
-    if (value && lower(*value) == "close")
+    if (value && hasToken(*value, "close"))
     {
         return false;
     }
     return version == "HTTP/1.1" ||
-           (value && lower(*value) == "keep-alive");
+           (value && hasToken(*value, "keep-alive"));
 }
 
-std::string HttpResponse::serialize(bool keep_alive) const
+std::string
+HttpResponse::serialize(bool keep_alive, bool head_only) const
 {
     if (status < 100 || status > 999 || reason.empty() ||
         reason.find_first_of("\r\n") != std::string::npos)
@@ -199,12 +220,20 @@ std::string HttpResponse::serialize(bool keep_alive) const
         }
         result += name + ": " + value + "\r\n";
     }
-    result += "Content-Length: " + std::to_string(body.size()) +
-              "\r\n";
+    const bool body_allowed = status >= 200 && status != 204 &&
+                              status != 304;
+    if (body_allowed)
+    {
+        result += "Content-Length: " + std::to_string(body.size()) +
+                  "\r\n";
+    }
     result += keep_alive ? "Connection: keep-alive\r\n"
                          : "Connection: close\r\n";
     result += "\r\n";
-    result += body;
+    if (body_allowed && !head_only)
+    {
+        result += body;
+    }
     return result;
 }
 
@@ -398,10 +427,10 @@ std::string HttpSession::takeBuffered()
 }
 
 void HttpSession::sendResponse(
-    const HttpResponse& response, bool keep_alive
+    const HttpResponse& response, bool keep_alive, bool head_only
 )
 {
-    const auto data = response.serialize(keep_alive);
+    const auto data = response.serialize(keep_alive, head_only);
     m_stream.writeAll(std::as_bytes(std::span(data)));
 }
 
