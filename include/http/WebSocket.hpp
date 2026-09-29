@@ -29,6 +29,7 @@ class WebSocketSession
 {
 public:
     static bool validUpgrade(const HttpRequest& request);
+    static bool validText(std::string_view text);
 
     WebSocketSession(
         Stream& stream,

@@ -15,7 +15,8 @@ Uri Uri::parse(std::string_view text)
         throw std::invalid_argument("URL has no scheme");
     }
     result.scheme = text.substr(0, scheme_end);
-    if (result.scheme != "http" && result.scheme != "https")
+    if (result.scheme != "http" && result.scheme != "https" &&
+        result.scheme != "ws" && result.scheme != "wss")
     {
         throw std::invalid_argument("unsupported URL scheme");
     }
@@ -68,7 +69,9 @@ Uri Uri::parse(std::string_view text)
     {
         throw std::invalid_argument("invalid URL host");
     }
-    result.port = result.scheme == "https" ? 443 : 80;
+    result.port = (result.scheme == "https" || result.scheme == "wss")
+                      ? 443
+                      : 80;
     if (!port_text.empty())
     {
         unsigned number = 0;
@@ -123,8 +126,8 @@ std::string Uri::authority() const
     std::string result = host.find(':') != std::string::npos
                              ? "[" + host + "]"
                              : host;
-    if ((scheme == "http" && port != 80) ||
-        (scheme == "https" && port != 443))
+    if (((scheme == "http" || scheme == "ws") && port != 80) ||
+        ((scheme == "https" || scheme == "wss") && port != 443))
     {
         result += ":" + std::to_string(port);
     }

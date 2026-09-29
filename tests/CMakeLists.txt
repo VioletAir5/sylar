@@ -54,6 +54,17 @@ add_test(
 )
 set_tests_properties(WebSocketApp.ProtocolAndShutdown PROPERTIES TIMEOUT 20)
 
+if(OPENSSL_EXECUTABLE)
+    add_test(
+        NAME WebSocketClientApp.WsAndWss
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_websocket_client_app.py"
+            $<TARGET_FILE:ws_client>
+            $<TARGET_FILE:ws_echo_server>
+    )
+    set_tests_properties(WebSocketClientApp.WsAndWss PROPERTIES TIMEOUT 25)
+endif()
+
 add_test(
     NAME SqliteApp.PersistsAcrossProcesses
     COMMAND Python3::Interpreter

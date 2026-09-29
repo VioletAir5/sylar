@@ -164,6 +164,11 @@ unsigned char octet(char value)
 
 } // namespace
 
+bool WebSocketSession::validText(std::string_view text)
+{
+    return validUtf8(text);
+}
+
 bool WebSocketSession::validUpgrade(const HttpRequest& request)
 {
     const auto upgrade = request.header("upgrade");
