@@ -184,3 +184,29 @@ TEST(HttpTest, RejectsNonAsciiHeaderNames)
     sylar::HttpSession session(stream);
     EXPECT_THROW(session.readRequest(request), std::invalid_argument);
 }
+
+TEST(HttpTest, RejectsControlBytesInTargetAndFields)
+{
+    sylar::HttpRequest request;
+    MemoryStream target("GET /\x01 HTTP/1.1\r\nHost: example\r\n\r\n"
+    );
+    sylar::HttpSession target_session(target);
+    EXPECT_THROW(
+        target_session.readRequest(request),
+        std::invalid_argument
+    );
+
+    MemoryStream field(
+        std::string("GET / HTTP/1.1\r\nHost: example") + '\0' +
+        "\r\n\r\n"
+    );
+    sylar::HttpSession field_session(field);
+    EXPECT_THROW(
+        field_session.readRequest(request),
+        std::invalid_argument
+    );
+
+    sylar::HttpResponse response;
+    response.headers["X-Test"] = std::string("bad") + '\0';
+    EXPECT_THROW(response.serialize(), std::invalid_argument);
+}

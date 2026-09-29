@@ -79,6 +79,16 @@ bool validToken(std::string_view text)
     return true;
 }
 
+bool validFieldValue(std::string_view text)
+{
+    return std::all_of(
+        text.begin(),
+        text.end(),
+        [](unsigned char ch)
+        { return ch == '\t' || (ch >= ' ' && ch != 0x7f); }
+    );
+}
+
 void parseHead(std::string_view head, HttpRequest& request)
 {
     const auto line_end = head.find("\r\n");
@@ -102,6 +112,11 @@ void parseHead(std::string_view head, HttpRequest& request)
     request.version = line.substr(second + 1);
     if (!validToken(request.method) || request.target.empty() ||
         request.target[0] != '/' ||
+        std::any_of(
+            request.target.begin(),
+            request.target.end(),
+            [](unsigned char ch) { return ch <= ' ' || ch >= 0x7f; }
+        ) ||
         (request.version != "HTTP/1.1" &&
          request.version != "HTTP/1.0"))
     {
@@ -125,9 +140,7 @@ void parseHead(std::string_view head, HttpRequest& request)
         }
         const auto name = lower(header.substr(0, colon));
         const auto value = trim(header.substr(colon + 1));
-        if (value.find('\r') != std::string_view::npos ||
-            value.find('\n') != std::string_view::npos ||
-            request.headers.contains(name))
+        if (!validFieldValue(value) || request.headers.contains(name))
         {
             throw std::invalid_argument(
                 "invalid or duplicate HTTP header"
@@ -204,7 +217,7 @@ std::string
 HttpResponse::serialize(bool keep_alive, bool head_only) const
 {
     if (status < 100 || status > 999 || reason.empty() ||
-        reason.find_first_of("\r\n") != std::string::npos)
+        !validFieldValue(reason))
     {
         throw std::invalid_argument("invalid HTTP status");
     }
@@ -212,8 +225,7 @@ HttpResponse::serialize(bool keep_alive, bool head_only) const
                          reason + "\r\n";
     for (const auto& [name, value] : headers)
     {
-        if (!validToken(name) ||
-            value.find_first_of("\r\n") != std::string::npos)
+        if (!validToken(name) || !validFieldValue(value))
         {
             throw std::invalid_argument("invalid response header");
         }
