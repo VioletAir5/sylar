@@ -109,6 +109,22 @@ int main(int argc, char** argv)
                        ? sylar::TlsContext::server(argv[4], argv[5])
                        : std::shared_ptr<sylar::TlsContext>{};
         sylar::HttpServer server(io, pool, routes(), std::move(tls));
+        server.addWebSocket(
+            "/ws",
+            [](sylar::WebSocketSession& session,
+               const sylar::WebSocketMessage& message)
+            {
+                if (message.type ==
+                    sylar::WebSocketMessage::Type::Text)
+                {
+                    session.sendText(message.payload);
+                }
+                else
+                {
+                    session.sendBinary(message.payload);
+                }
+            }
+        );
         server.start("0.0.0.0", static_cast<std::uint16_t>(port));
         std::cout << (tls_mode ? "https_server" : "http_server")
                   << " listening on port " << server.localPort()

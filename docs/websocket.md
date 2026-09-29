@@ -9,4 +9,4 @@
 ./build/sylar/ws_echo_server 8444 4 --tls cert.pem key.pem
 ```
 
-示例路由是 `/ws`。HTTP 和 WebSocket 目前使用独立的服务端实例与监听端口；尚未实现同端口升级、客户端 API、扩展压缩或子协议协商。协议测试同时运行 ws 与 wss，覆盖握手后紧接着发送的帧、两种扩展长度、分片、ping/pong、关闭和未掩码错误帧。设计依据：[RFC 6455](https://www.rfc-editor.org/rfc/rfc6455.html)。
+示例路由是 `/ws`。WebSocket 可以通过 `HttpServer::addWebSocket(path, handler)` 与普通 HTTP 路由共用监听端口；`http_server` 示例在 `/ws` 提供 ws/wss 回显。也可单独运行 `ws_echo_server`。尚未实现客户端 API、扩展压缩或子协议协商。协议测试同时运行 ws 与 wss，覆盖握手后紧接着发送的帧、两种扩展长度、分片、ping/pong、关闭和未掩码错误帧。设计依据：[RFC 6455](https://www.rfc-editor.org/rfc/rfc6455.html)。

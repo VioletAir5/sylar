@@ -203,3 +203,105 @@ TEST(HttpClientTest, DecodesChunkedResponse)
     io.run();
     EXPECT_EQ(response.body, "hello world");
 }
+
+TEST(HttpServerTest, UpgradesWebSocketAndKeepsHttpRouteOnSamePort)
+{
+    sylar::IOManager io;
+    auto routes = std::make_shared<sylar::ServletDispatch>();
+    routes->addExact(
+        "/health",
+        std::make_shared<sylar::FunctionServlet>(
+            [](const sylar::HttpRequest&)
+            {
+                sylar::HttpResponse response;
+                response.body = "ok";
+                return response;
+            }
+        )
+    );
+    sylar::HttpServer server(io, routes);
+    server.addWebSocket(
+        "/ws",
+        [](sylar::WebSocketSession& session,
+           const sylar::WebSocketMessage& message)
+        { session.sendText(message.payload); }
+    );
+    EXPECT_THROW(server.addWebSocket("", {}), std::invalid_argument);
+    server.start("127.0.0.1", 0);
+    std::string websocket_wire;
+    sylar::HttpResponse http_response;
+    io.schedule(
+        [&]
+        {
+            {
+                auto socket = sylar::Socket::tcp();
+                socket.connect(
+                    io,
+                    sylar::Address::ipv4(
+                        "127.0.0.1",
+                        server.localPort()
+                    ),
+                    5s
+                );
+                sylar::SocketStream stream(io, std::move(socket), 5s);
+                std::string request =
+                    "GET /ws?room=1 HTTP/1.1\r\n"
+                    "Host: localhost\r\n"
+                    "Upgrade: websocket\r\n"
+                    "Connection: Upgrade\r\n"
+                    "Sec-WebSocket-Version: 13\r\n"
+                    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+                    "\r\n";
+                request.append(
+                    {static_cast<char>(0x81),
+                     static_cast<char>(0x82),
+                     1,
+                     2,
+                     3,
+                     4,
+                     static_cast<char>('h' ^ 1),
+                     static_cast<char>('i' ^ 2)}
+                );
+                stream.writeAll(std::as_bytes(std::span(request)));
+                const std::string frame{
+                    static_cast<char>(0x81),
+                    2,
+                    'h',
+                    'i'};
+                std::byte buffer[512];
+                while (websocket_wire.find(frame) == std::string::npos
+                )
+                {
+                    const auto count = stream.readSome(buffer);
+                    if (count == 0)
+                    {
+                        break;
+                    }
+                    websocket_wire.append(
+                        reinterpret_cast<const char*>(buffer),
+                        count
+                    );
+                }
+            }
+            const auto uri = sylar::Uri::parse(
+                "http://127.0.0.1:" +
+                std::to_string(server.localPort()) + "/health"
+            );
+            http_response = sylar::HttpClient::request(io, uri);
+            server.stop();
+        }
+    );
+    io.run();
+    EXPECT_NE(
+        websocket_wire.find("101 Switching Protocols"),
+        std::string::npos
+    );
+    EXPECT_NE(
+        websocket_wire.find(
+            std::string{static_cast<char>(0x81), 2, 'h', 'i'}
+        ),
+        std::string::npos
+    );
+    EXPECT_EQ(http_response.status, 200);
+    EXPECT_EQ(http_response.body, "ok");
+}

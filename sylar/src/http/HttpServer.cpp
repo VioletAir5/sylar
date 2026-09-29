@@ -1,10 +1,15 @@
 #include "http/HttpServer.hpp"
 
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 
 #include "net/Socket.hpp"
@@ -12,14 +17,60 @@
 #include "net/TlsStream.hpp"
 
 #include "http/Http.hpp"
+#include "http/WebSocket.hpp"
 
 namespace sylar
 {
+
+class WebSocketRouteRegistry
+{
+public:
+    void add(std::string path, HttpServer::WebSocketHandler handler)
+    {
+        if (path.empty() || path.front() != '/' || !handler)
+        {
+            throw std::invalid_argument("invalid WebSocket route");
+        }
+        std::lock_guard lock(m_mutex);
+        m_handlers.insert_or_assign(
+            std::move(path),
+            std::move(handler)
+        );
+        m_hasRoutes.store(true, std::memory_order_release);
+    }
+
+    std::optional<HttpServer::WebSocketHandler>
+    find(std::string_view target) const
+    {
+        if (!m_hasRoutes.load(std::memory_order_acquire))
+        {
+            return std::nullopt;
+        }
+        const auto query = target.find('?');
+        std::lock_guard lock(m_mutex);
+        const auto it = m_handlers.find(
+            std::string(target.substr(0, query))
+        );
+        if (it == m_handlers.end())
+        {
+            return std::nullopt;
+        }
+        return it->second;
+    }
+
+private:
+    mutable std::mutex m_mutex;
+    std::atomic_bool m_hasRoutes{false};
+    std::unordered_map<std::string, HttpServer::WebSocketHandler>
+        m_handlers;
+};
+
 namespace
 {
 
 TcpServer::Handler makeHandler(
     std::shared_ptr<ServletDispatch> dispatch,
+    std::shared_ptr<WebSocketRouteRegistry> ws_routes,
     std::shared_ptr<TlsContext> tls
 )
 {
@@ -28,6 +79,7 @@ TcpServer::Handler makeHandler(
         throw std::invalid_argument("null servlet dispatch");
     }
     return [dispatch = std::move(dispatch),
+            ws_routes = std::move(ws_routes),
             tls = std::move(tls)](IOManager& io, int fd)
     {
         try
@@ -71,6 +123,44 @@ TcpServer::Handler makeHandler(
                     return;
                 }
 
+                if (const auto handler = ws_routes->find(
+                        request.target
+                    ))
+                {
+                    if (!WebSocketSession::validUpgrade(request))
+                    {
+                        HttpResponse bad;
+                        bad.status = 400;
+                        bad.reason = "Bad Request";
+                        bad.body = "400 Bad Request\n";
+                        session.sendResponse(bad, false);
+                        return;
+                    }
+                    WebSocketSession websocket(
+                        *stream,
+                        request,
+                        session.takeBuffered()
+                    );
+                    for (;;)
+                    {
+                        std::optional<WebSocketMessage> message;
+                        try
+                        {
+                            message = websocket.readMessage();
+                        }
+                        catch (const std::invalid_argument&)
+                        {
+                            websocket.close(1002);
+                            return;
+                        }
+                        if (!message)
+                        {
+                            return;
+                        }
+                        (*handler)(websocket, *message);
+                    }
+                }
+
                 const bool keep_alive = request.keepAlive();
                 HttpResponse response;
                 try
@@ -105,7 +195,11 @@ HttpServer::HttpServer(
     std::shared_ptr<ServletDispatch> dispatch,
     std::shared_ptr<TlsContext> tls
 )
-    : m_tcp(io, makeHandler(std::move(dispatch), std::move(tls)))
+    : m_wsRoutes(std::make_shared<WebSocketRouteRegistry>())
+    , m_tcp(
+          io,
+          makeHandler(std::move(dispatch), m_wsRoutes, std::move(tls))
+      )
 {
 }
 
@@ -115,12 +209,20 @@ HttpServer::HttpServer(
     std::shared_ptr<ServletDispatch> dispatch,
     std::shared_ptr<TlsContext> tls
 )
-    : m_tcp(
+    : m_wsRoutes(std::make_shared<WebSocketRouteRegistry>())
+    , m_tcp(
           acceptor,
           workers,
-          makeHandler(std::move(dispatch), std::move(tls))
+          makeHandler(std::move(dispatch), m_wsRoutes, std::move(tls))
       )
 {
+}
+
+void HttpServer::addWebSocket(
+    std::string path, WebSocketHandler handler
+)
+{
+    m_wsRoutes->add(std::move(path), std::move(handler));
 }
 
 void HttpServer::start(const std::string& ipv4, std::uint16_t port)
