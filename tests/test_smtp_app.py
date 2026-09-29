@@ -12,7 +12,8 @@ from pathlib import Path
 CRLF = bytes((13, 10))
 
 
-def run_case(executable, message_file, cert=None, key=None, reject=False):
+def run_case(executable, message_file, cert=None, key=None, reject=False,
+             starttls=False, advertise=True):
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
     listener.listen()
@@ -24,7 +25,7 @@ def run_case(executable, message_file, cert=None, key=None, reject=False):
         try:
             connection, _ = listener.accept()
             connection.settimeout(5)
-            if cert:
+            if cert and not starttls:
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 context.load_cert_chain(str(cert), str(key))
                 connection = context.wrap_socket(
@@ -42,10 +43,35 @@ def run_case(executable, message_file, cert=None, key=None, reject=False):
 
                 if read_line() != b"EHLO localhost" + CRLF:
                     raise RuntimeError("missing EHLO")
-                connection.sendall(
-                    b"250-fake" + CRLF +
-                    b"250 SIZE 100000" + CRLF
-                )
+                if starttls and advertise:
+                    connection.sendall(
+                        b"250-fake" + CRLF +
+                        b"250-STARTTLS" + CRLF +
+                        b"250 SIZE 100000" + CRLF
+                    )
+                    if read_line() != b"STARTTLS" + CRLF:
+                        raise RuntimeError("missing STARTTLS")
+                    connection.sendall(b"220 ready for TLS" + CRLF)
+                    stream.close()
+                    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                    context.load_cert_chain(str(cert), str(key))
+                    connection = context.wrap_socket(
+                        connection, server_side=True
+                    )
+                    stream = connection.makefile("rb")
+                    if read_line() != b"EHLO localhost" + CRLF:
+                        raise RuntimeError("missing post-TLS EHLO")
+                    connection.sendall(
+                        b"250-fake" + CRLF +
+                        b"250 SIZE 100000" + CRLF
+                    )
+                else:
+                    connection.sendall(
+                        b"250-fake" + CRLF +
+                        b"250 SIZE 100000" + CRLF
+                    )
+                    if starttls:
+                        return
                 if read_line() != (
                     b"MAIL FROM:<sender@example.test>" + CRLF
                 ):
@@ -91,7 +117,7 @@ def run_case(executable, message_file, cert=None, key=None, reject=False):
         str(message_file),
     ]
     if cert:
-        command += ["--tls", str(cert)]
+        command += ["--starttls" if starttls else "--tls", str(cert)]
     completed = subprocess.run(
         command, capture_output=True, text=True,
         check=False, timeout=5,
@@ -101,7 +127,7 @@ def run_case(executable, message_file, cert=None, key=None, reject=False):
         raise RuntimeError("fake SMTP server did not stop")
     if "error" in result:
         raise result["error"]
-    if reject:
+    if reject or (starttls and not advertise):
         if completed.returncode == 0:
             raise RuntimeError("rejected recipient was accepted")
     elif completed.returncode != 0:
@@ -137,6 +163,9 @@ def main(executable):
             timeout=5, check=True,
         )
         run_case(executable, message, cert, key)
+        run_case(executable, message, cert, key, starttls=True)
+        run_case(executable, message, cert, key,
+                 starttls=True, advertise=False)
 
 
 if __name__ == "__main__":

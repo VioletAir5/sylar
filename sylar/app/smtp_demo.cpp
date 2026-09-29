@@ -17,12 +17,16 @@ int main(int argc, char** argv)
 {
     try
     {
-        if (argc != 6 &&
-            !(argc == 8 && std::string_view(argv[6]) == "--tls"))
+        const bool tls_mode = argc == 8 &&
+                              std::string_view(argv[6]) == "--tls";
+        const bool starttls_mode = argc == 8 &&
+                                   std::string_view(argv[6]) ==
+                                       "--starttls";
+        if (argc != 6 && !tls_mode && !starttls_mode)
         {
             throw std::invalid_argument(
                 "usage: smtp_demo HOST PORT FROM TO "
-                "message.txt [--tls ca.pem]"
+                "message.txt [--tls ca.pem | --starttls ca.pem]"
             );
         }
         unsigned port = 0;
@@ -66,7 +70,8 @@ int main(int argc, char** argv)
                     message,
                     "localhost",
                     std::chrono::seconds(5),
-                    tls
+                    tls,
+                    starttls_mode
                 );
             }
         );

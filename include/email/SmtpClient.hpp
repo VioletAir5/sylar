@@ -31,7 +31,8 @@ public:
         const SmtpMessage& message,
         std::string helo_host = "localhost",
         std::chrono::milliseconds timeout = std::chrono::seconds(30),
-        std::shared_ptr<TlsContext> tls = {}
+        std::shared_ptr<TlsContext> tls = {},
+        bool start_tls = false
     );
 };
 

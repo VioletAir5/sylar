@@ -13,7 +13,7 @@
 - **ZooKeeper**：会话连接与 znode CRUD、子节点查询；见 [ZooKeeper 文档](docs/zookeeper.md)。
 - **MySQL**：预编译读写、二进制参数与本地隔离实例测试；见 [MySQL 文档](docs/mysql.md)。
 - **Redis**：二进制安全命令、类型化应答与本地实例测试；通过阻塞任务池使用，见 [Redis 文档](docs/redis.md)。
-- **SMTP**：SMTP 客户端、收件人应答校验、DATA 转义和隐式 TLS；见 [SMTP 文档](docs/smtp.md)。
+- **SMTP**：SMTP 客户端、收件人应答校验、DATA 转义、隐式 TLS 与 STARTTLS；见 [SMTP 文档](docs/smtp.md)。
 - **SQLite3**：RAII 连接、预编译语句、事务与轻量单表 ORM；同步调用约束见 [SQLite 文档](docs/sqlite.md)。
 - **HTTP/HTTPS 与 WebSocket**：HTTP/1.1 请求与响应、keep-alive、chunked 分帧、TLS 客户端与服务端、Servlet 路由，以及 ws/wss 服务端与客户端、文本和二进制帧；HTTP 服务可在同端口升级 WebSocket。
 
