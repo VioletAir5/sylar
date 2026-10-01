@@ -4,11 +4,11 @@
 
 ## 1. 有栈 Fiber 能否在另一个工作线程恢复？
 
-**问题：** Boost.Context 保存执行栈和上下文；把正在挂起的 Fiber 随意交给另一线程恢复，会破坏线程局部状态与 I/O 事件归属。
+**问题：** [Boost.Context](https://www.boost.org/library/latest/context/) 本身允许迁移 Fiber，但本项目的 fd 等待、定时器、Scheduler 和线程局部状态都归属某个 IOManager。若只移动 Fiber 而不迁移这些状态，恢复位置与事件归属会不一致。
 
 **解决：** 每个 IOManager 独占 Scheduler、epoll 和 TimerManager；Fiber 固定由创建它的工作线程恢复。跨线程工作通过 `IOManagerPool::post` 投递回调，用 eventfd 唤醒目标线程。详见 [架构](architecture.md) 与 `tests/test_iomanager_pool.cpp`。
 
-**面试追问：** 这牺牲了跨线程 Fiber 迁移，但让 fd waiter、定时器和栈所有权更清晰；负载均衡发生在**新连接分派**时。
+**面试追问：** “不能迁移”是本项目的设计约束，不是 Boost.Context 的通用限制；负载均衡发生在**新连接分派**时。
 
 ## 2. 工作线程阻塞在 epoll_wait 时，别的线程如何立即投递任务？
 
