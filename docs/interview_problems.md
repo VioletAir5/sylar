@@ -1,0 +1,67 @@
+# 面试用：开发中遇到的 8 个问题
+
+这些问题基于仓库中的设计、测试和测量。讲述时区分“已解决”“目前的设计约束”和“待解决”，不要把单机结果说成生产集群结论。
+
+## 1. 有栈 Fiber 能否在另一个工作线程恢复？
+
+**问题：** Boost.Context 保存执行栈和上下文；把正在挂起的 Fiber 随意交给另一线程恢复，会破坏线程局部状态与 I/O 事件归属。
+
+**解决：** 每个 IOManager 独占 Scheduler、epoll 和 TimerManager；Fiber 固定由创建它的工作线程恢复。跨线程工作通过 `IOManagerPool::post` 投递回调，用 eventfd 唤醒目标线程。详见 [架构](architecture.md) 与 `tests/test_iomanager_pool.cpp`。
+
+**面试追问：** 这牺牲了跨线程 Fiber 迁移，但让 fd waiter、定时器和栈所有权更清晰；负载均衡发生在**新连接分派**时。
+
+## 2. 工作线程阻塞在 epoll_wait 时，别的线程如何立即投递任务？
+
+**问题：** 只把回调放入队列，目标线程可能一直睡在 epoll 中。
+
+**解决：** 每个 IOManager 注册 eventfd；`post()` 入队并写 eventfd，事件循环被唤醒后执行待处理回调。关闭期间还要禁止或取消新投递，避免任务悬空。代码见 `sylar/src/fiber/IOManager.cpp`。
+
+**验证：** 跨线程投递与停机测试；解释 eventfd 比忙轮询更适合空闲场景。
+
+## 3. 30 秒超时为何会拖慢高频 echo？
+
+**问题：** 最初每次 I/O 等待都创建、马上取消一个定时器。`perf` 中红黑树删除占用户态采样约 12.88%。
+
+**解决：** echo 每条连接维护一个空闲期限，读写进展只更新时间戳；期限到达才检查是否续期。优化后同一热点符号在一次采样中约 0.08%。10 轮、每轮 10 万请求的同机测试，中位吞吐从约 301,516 到 314,212 req/s，约提升 4.2%。证据和限制见 [echo 基准](echo_benchmark.md)。
+
+**面试追问：** 这是针对 echo 示例的优化，不代表所有 `SocketStream` 调用已经消除了定时器成本。
+
+## 4. 同步数据库客户端会不会卡住整个 I/O 线程？
+
+**问题：** SQLite/MySQL/Redis/ZooKeeper 的同步调用若直接放在 I/O Fiber 中执行，线程不会因为 Fiber 语法而自动让出，其他连接也会受阻。
+
+**解决：** `BlockingExecutor` 将同步函数交给独立线程池；调用 Fiber 等待完成通知。SQLite 再通过固定大小连接池限制并发连接数。详见 [阻塞任务池](blocking_executor.md) 与 [SQLite](sqlite.md)。
+
+**取舍：** 任务池关闭会等待已运行的函数；不能强制中断正在执行的第三方阻塞调用，需要设置其自身超时。
+
+## 5. HTTP keep-alive、chunked 与 1xx 为什么容易出错？
+
+**问题：** 流式 TCP 读可能一次拿到多个请求，错误的消息边界会使后续请求错位；客户端也不能把 100/103 当最终响应，HEAD/204/304 不应读取消息体。
+
+**解决：** `HttpSession` 留存未消费字节，按 Content-Length 或 chunked 分帧，拒绝重复/冲突头；客户端跳过有限个临时响应，再读最终响应。最近补了 ASCII token、控制字节与 trailer 限制。见 `tests/test_http.cpp` 和 `tests/test_http_server.cpp`。
+
+**面试追问：** 这是受限的 HTTP/1.1 实现，不要宣称覆盖完整协议、HTTP/2 或生产代理场景。
+
+## 6. 为什么“4 线程比 1 线程慢”和“4 线程明显更快”都曾出现？
+
+**问题：** Python 或单进程 C++ 客户端与服务端同机时，压测端可能先成为瓶颈；连接数、请求大小和是否并行驱动都会改变结果。
+
+**解决：** 用原生 epoll 客户端、多个压测进程、固定请求数和多轮中位数记录条件，再用 perf 定位热点。echo 在指定 4 客户端负载下 4 工作线程表现较好；HTTP 小响应测试中 4 工作线程仍低于 1 线程，**原因尚未确认**。见 [echo 基准](echo_benchmark.md) 与 [HTTP 基准](http_benchmark.md)。
+
+**面试表述：** 只报告负载和环境，不把同机数字当作框架上限；HTTP 的扩展性问题是后续 profiling 任务。
+
+## 7. SIGTERM 与 fd 生命周期如何安全收尾？
+
+**问题：** 监听 fd 关闭时，epoll 中可能仍有等待；工作线程还有连接 Fiber。若先释放对象再取消等待，可能访问失效状态。
+
+**解决：** 信号通过 signalfd 进入主事件循环；TcpServer 停止接受并取消监听等待，IOManagerPool 请求各工作线程停止并 join。连接 fd 由 RAII 对象持有。见 `sylar/src/net/TcpServer.cpp` 与 `sylar/src/fiber/IOManagerPool.cpp`。
+
+**限制：** 当前停止可取消在途 I/O，不保证所有 HTTP/WebSocket 请求无损完成；多副本滚动更新时必须说明这一点。
+
+## 8. 多副本部署时，怎样证明它们真的独立？
+
+**问题：** 单进程多线程只提高一台机器内的并发，无法证明副本隔离或节点故障后的可用性。
+
+**解决：** HTTP 示例增加 `/health`、`/ready`、`/instance`；本机集成测试起两个进程，确认不同 ID，并在一个退出后检查另一进程。Kubernetes 清单定义 3 副本、Service、探针、滚动更新和尽力跨节点分散。见 [多副本部署](distributed_deployment.md)。
+
+**限制：** 本机测试只覆盖进程级隔离；真实节点故障、跨副本 WebSocket 广播、共享存储一致性需要 Kubernetes 环境和新的上层模块验证。

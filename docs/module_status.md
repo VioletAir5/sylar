@@ -23,3 +23,7 @@
 ## 验收原则
 
 每个新增模块至少满足：公开接口、回环或协议测试、异常和停机路径测试、Release 构建通过、README 的可运行示例。性能数据沿用 [TCP echo 基准](echo_benchmark.md) 的环境与方法记录；HTTP 单独建立基准，不直接沿用 echo 吞吐量。
+
+## 部署层
+
+HTTP 示例现可无状态多副本运行；Kubernetes 清单提供三副本 Deployment、Service、探针与滚动更新设置。本机双进程测试覆盖副本身份与单副本退出后的独立可用性。镜像构建和真实 Kubernetes 运行尚未验收，跨副本 WebSocket 广播、共享状态一致性与无损连接排空未实现。详见 [多副本部署](distributed_deployment.md)。

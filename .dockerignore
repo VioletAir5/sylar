@@ -1,0 +1,7 @@
+.git
+build*
+**/__pycache__
+*.log
+*.data
+.codex
+.agents
