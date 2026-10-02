@@ -1,7 +1,10 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -9,6 +12,7 @@
 #include "net/Stream.hpp"
 
 #include "http/Http.hpp"
+#include "http/OutboundBudget.hpp"
 
 namespace sylar
 {
@@ -35,7 +39,10 @@ public:
         Stream& stream,
         const HttpRequest& request,
         std::string buffered = {},
-        std::size_t max_message = 1024 * 1024
+        std::size_t max_message = 1024 * 1024,
+        std::shared_ptr<OutboundBudget> outbound = {},
+        std::chrono::milliseconds write_timeout =
+            std::chrono::seconds(2)
     );
 
     // A null value means the peer completed the close handshake.
@@ -54,6 +61,9 @@ private:
     std::string m_fragment;
     std::uint8_t m_fragmentOpcode = 0;
     bool m_closed = false;
+    std::shared_ptr<OutboundBudget> m_outbound;
+    std::chrono::milliseconds m_writeTimeout;
+    std::atomic_flag m_sending = ATOMIC_FLAG_INIT;
 };
 
 } // namespace sylar

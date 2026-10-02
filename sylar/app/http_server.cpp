@@ -311,6 +311,20 @@ int main(int argc, char** argv)
                             request_stats.adaptive ? 1 : 0
                         ) +
                         "\n";
+                    const auto outbound = sylar::OutboundBudget::
+                        processDefault();
+                    response.body +=
+                        "# TYPE sylar_ws_outbound_bytes gauge\n"
+                        "sylar_ws_outbound_bytes " +
+                        std::to_string(outbound->inFlightBytes()) +
+                        "\n# TYPE sylar_ws_outbound_limit_bytes "
+                        "gauge\n"
+                        "sylar_ws_outbound_limit_bytes " +
+                        std::to_string(outbound->maximumBytes()) +
+                        "\n# TYPE sylar_ws_outbound_rejected_total "
+                        "counter\n"
+                        "sylar_ws_outbound_rejected_total " +
+                        std::to_string(outbound->rejected()) + "\n";
                     const auto workers = pool.diagnostics();
                     for (std::size_t index = 0;
                          index < workers.size();

@@ -3,12 +3,18 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cerrno>
+#include <chrono>
 #include <limits>
+#include <memory>
 #include <span>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 
 #include <openssl/evp.h>
+
+#include "fiber/RequestContext.hpp"
 
 namespace sylar
 {
@@ -187,13 +193,21 @@ WebSocketSession::WebSocketSession(
     Stream& stream,
     const HttpRequest& request,
     std::string buffered,
-    std::size_t max_message
+    std::size_t max_message,
+    std::shared_ptr<OutboundBudget> outbound,
+    std::chrono::milliseconds write_timeout
 )
     : m_stream(stream)
     , m_buffered(std::move(buffered))
     , m_maxMessage(max_message)
+    , m_outbound(
+          outbound ? std::move(outbound)
+                   : OutboundBudget::processDefault()
+      )
+    , m_writeTimeout(write_timeout)
 {
-    if (!validUpgrade(request) || max_message == 0)
+    if (!validUpgrade(request) || max_message == 0 ||
+        write_timeout.count() <= 0)
     {
         throw std::invalid_argument(
             "invalid WebSocket upgrade request"
@@ -366,6 +380,33 @@ void WebSocketSession::sendFrame(
     std::uint8_t opcode, std::string_view payload
 )
 {
+    if (m_sending.test_and_set(std::memory_order_acquire))
+    {
+        throw std::system_error(
+            ENOBUFS,
+            std::generic_category(),
+            "concurrent WebSocket send"
+        );
+    }
+    struct SendingGuard
+    {
+        std::atomic_flag& flag;
+        ~SendingGuard()
+        {
+            flag.clear(std::memory_order_release);
+        }
+    } sending{m_sending};
+    const auto reservation = m_outbound->tryReserve(
+        payload.size() + 14
+    );
+    if (!reservation)
+    {
+        throw std::system_error(
+            ENOBUFS,
+            std::generic_category(),
+            "WebSocket outbound budget"
+        );
+    }
     std::string frame;
     frame.push_back(static_cast<char>(0x80 | opcode));
     if (payload.size() <= 125)
@@ -388,7 +429,20 @@ void WebSocketSession::sendFrame(
         }
     }
     frame += payload;
-    m_stream.writeAll(std::as_bytes(std::span(frame)));
+    auto context = std::make_shared<RequestContext>(
+        std::chrono::steady_clock::now() + m_writeTimeout
+    );
+    m_stream.setRequestContext(context);
+    try
+    {
+        m_stream.writeAll(std::as_bytes(std::span(frame)));
+    }
+    catch (...)
+    {
+        m_stream.setRequestContext({});
+        throw;
+    }
+    m_stream.setRequestContext({});
 }
 
 void WebSocketSession::sendText(std::string_view text)
