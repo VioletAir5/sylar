@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -42,11 +44,19 @@ public:
     void start(const Address& address);
     void start(const std::vector<Address>& addresses);
     void stop();
+    // During drain, completed HTTP responses close their connections.
+    void beginDrain() noexcept;
+    bool draining() const noexcept;
+    void setMaxConnections(std::size_t limit);
+    std::size_t maxConnections() const noexcept;
+    std::size_t activeConnections() const noexcept;
+    std::size_t rejectedConnections() const noexcept;
     std::uint16_t localPort() const;
     std::vector<Address> localAddresses() const;
 
 private:
     std::shared_ptr<WebSocketRouteRegistry> m_wsRoutes;
+    std::shared_ptr<std::atomic_bool> m_draining;
     TcpServer m_tcp;
 };
 

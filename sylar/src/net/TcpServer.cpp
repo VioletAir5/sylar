@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cerrno>
 #include <stdexcept>
 #include <system_error>
@@ -83,6 +84,26 @@ struct TcpServer::State
     std::uint16_t port = 0;
     bool running = false;
     bool started = false;
+    std::size_t max_connections = 0;
+    std::atomic_size_t active{0};
+    std::atomic_size_t rejected{0};
+    struct Connection
+    {
+        Connection(int value, std::shared_ptr<State> owner)
+            : fd(value)
+            , state(std::move(owner))
+        {
+        }
+
+        ~Connection()
+        {
+            fd.close();
+            state->active.fetch_sub(1, std::memory_order_relaxed);
+        }
+
+        OwnedFd fd;
+        std::shared_ptr<State> state;
+    };
 };
 
 TcpServer::TcpServer(IOManager& io, Handler handler)
@@ -258,6 +279,32 @@ void TcpServer::stop()
     state.port = 0;
 }
 
+void TcpServer::setMaxConnections(std::size_t limit)
+{
+    if (m_state->started)
+    {
+        throw std::logic_error(
+            "connection limit cannot change after start"
+        );
+    }
+    m_state->max_connections = limit;
+}
+
+std::size_t TcpServer::maxConnections() const noexcept
+{
+    return m_state->max_connections;
+}
+
+std::size_t TcpServer::activeConnections() const noexcept
+{
+    return m_state->active.load(std::memory_order_relaxed);
+}
+
+std::size_t TcpServer::rejectedConnections() const noexcept
+{
+    return m_state->rejected.load(std::memory_order_relaxed);
+}
+
 std::uint16_t TcpServer::localPort() const
 {
     return m_state->port;
@@ -287,13 +334,29 @@ void TcpServer::acceptLoop(
         );
         if (fd >= 0)
         {
-            std::shared_ptr<OwnedFd> client;
+            if (state->max_connections != 0 &&
+                state->active.load(std::memory_order_relaxed) >=
+                    state->max_connections)
+            {
+                state->rejected.fetch_add(
+                    1,
+                    std::memory_order_relaxed
+                );
+                ::close(fd);
+                continue;
+            }
+            state->active.fetch_add(1, std::memory_order_relaxed);
+            std::shared_ptr<State::Connection> client;
             try
             {
-                client = std::make_shared<OwnedFd>(fd);
+                client = std::make_shared<State::Connection>(
+                    fd,
+                    state
+                );
             }
             catch (...)
             {
+                state->active.fetch_sub(1, std::memory_order_relaxed);
                 ::close(fd);
                 throw;
             }
@@ -301,14 +364,14 @@ void TcpServer::acceptLoop(
             {
                 state->workers->post(
                     [state, client](IOManager& worker)
-                    { state->handler(worker, client->fd); }
+                    { state->handler(worker, client->fd.fd); }
                 );
             }
             else
             {
                 state->io.schedule(
                     [state, client]
-                    { state->handler(state->io, client->fd); }
+                    { state->handler(state->io, client->fd.fd); }
                 );
             }
             continue;

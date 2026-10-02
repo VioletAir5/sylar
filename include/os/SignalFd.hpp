@@ -14,12 +14,16 @@ namespace sylar
 class SignalFd
 {
 public:
-    SignalFd()
+    explicit SignalFd(bool include_usr1 = false)
     {
         sigset_t mask;
         ::sigemptyset(&mask);
         ::sigaddset(&mask, SIGINT);
         ::sigaddset(&mask, SIGTERM);
+        if (include_usr1)
+        {
+            ::sigaddset(&mask, SIGUSR1);
+        }
         const int error = ::pthread_sigmask(
             SIG_BLOCK,
             &mask,

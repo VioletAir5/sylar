@@ -1,4 +1,4 @@
-# 面试用：开发中遇到的 8 个问题
+# 面试用：开发中遇到的 9 个问题
 
 这些问题基于仓库中的设计、测试和测量。讲述时区分“已解决”“目前的设计约束”和“待解决”，不要把单机结果说成生产集群结论。
 
@@ -52,11 +52,11 @@
 
 ## 7. SIGTERM 与 fd 生命周期如何安全收尾？
 
-**问题：** 监听 fd 关闭时，epoll 中可能仍有等待；工作线程还有连接 Fiber。若先释放对象再取消等待，可能访问失效状态。
+**问题：** 直接停止 IOManager 会取消正在处理的 HTTP 请求；监听 fd 关闭时，epoll 中可能仍有等待。若先释放对象再取消等待，可能访问失效状态。
 
-**解决：** 信号通过 signalfd 进入主事件循环；TcpServer 停止接受并取消监听等待，IOManagerPool 请求各工作线程停止并 join。连接 fd 由 RAII 对象持有。见 `sylar/src/net/TcpServer.cpp` 与 `sylar/src/fiber/IOManagerPool.cpp`。
+**解决：** HTTP 示例通过 signalfd 接收 `SIGUSR1`，先让 readiness 返回 503、后续响应关闭 keep-alive；收到 `SIGTERM` 才停止监听，限时等待活动连接归零，再停止 worker。连接 fd 和活动计数由 RAII 租约一起管理。见[连接容量与排空](admission_and_drain.md)及 `tests/test_http_drain_app.py`。
 
-**限制：** 当前停止可取消在途 I/O，不保证所有 HTTP/WebSocket 请求无损完成；多副本滚动更新时必须说明这一点。
+**限制：** 超过期限的 I/O 仍会被取消，WebSocket 不会迁移到新副本。
 
 ## 8. 多副本部署时，怎样证明它们真的独立？
 
@@ -65,3 +65,11 @@
 **解决：** HTTP 示例增加 `/health`、`/ready`、`/instance`；本机集成测试起两个进程，确认不同 ID，并在一个退出后检查另一进程。Kubernetes 清单定义 3 副本、Service、探针、滚动更新和尽力跨节点分散。见 [多副本部署](distributed_deployment.md)。
 
 **限制：** 本机测试只覆盖进程级隔离；真实节点故障、跨副本 WebSocket 广播、共享存储一致性需要 Kubernetes 环境和新的上层模块验证。
+
+## 9. 连接满额时为什么不能让 Kubernetes 反复重启 Pod？
+
+**问题：** 每连接一个 Fiber 和 fd 若不设限，会在高峰下持续耗尽资源。设置上限后，新连接被关闭；HTTP liveness 探针若也走同一监听端口，会把“已满但存活”误判为故障，形成重启风暴。
+
+**解决：** acceptor 在创建 Fiber 前按活动连接数限流，满额关闭 fd 并累加拒绝计数；`/metrics` 暴露容量。readiness 仍走业务端口，以便满额时退出新流量；部署清单的 liveness 用进程存活检查，不因业务容量满额触发重启。见[连接容量与排空](admission_and_drain.md)。
+
+**取舍：** 进程存活检查无法发现事件循环卡死。完整生产方案应设置独立管理端口或看门狗；当前清单没有证明真实集群中的摘流时延。

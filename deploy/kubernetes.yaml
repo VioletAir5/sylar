@@ -51,15 +51,14 @@ spec:
             periodSeconds: 2
             failureThreshold: 2
           livenessProbe:
-            httpGet:
-              path: /health
-              port: http
+            exec:
+              command: ["/bin/sh", "-c", "kill -0 1"]
             periodSeconds: 10
             failureThreshold: 3
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "sleep 5"]
+                command: ["/bin/sh", "-c", "kill -USR1 1; sleep 5"]
           resources:
             requests:
               cpu: 100m

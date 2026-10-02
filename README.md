@@ -21,7 +21,7 @@
 
 ## 多副本部署与面试演示
 
-HTTP 示例新增 `/ready` 和 `/instance`。多个独立进程可由 Kubernetes Service 分配新连接；仓库提供 [容器与三副本部署清单](docs/distributed_deployment.md) 和本机双进程集成测试。可离线打开 [交互式架构动画](docs/architecture_demo.html)，切换正常流量、副本故障、滚动更新三个场景。[8 个开发问题与解决方法](docs/interview_problems.md) 给出对应代码、测量证据和仍未解决的限制。容器与 Kubernetes 部署尚未在本机实际运行。
+HTTP 示例提供 `/ready`、`/instance` 和 `/metrics`，并支持连接容量控制与限时排空。多个独立进程可由 Kubernetes Service 分配新连接；仓库提供 [容器与三副本部署清单](docs/distributed_deployment.md) 和本机双进程集成测试。可离线打开 [交互式架构动画](docs/architecture_demo.html)，切换正常流量、容量满额、副本故障和滚动更新四个场景。[9 个开发问题与解决方法](docs/interview_problems.md) 给出对应代码、测量证据和仍未解决的限制。[连接容量与排空设计](docs/admission_and_drain.md)说明过载、探针与滚动更新的取舍。容器与 Kubernetes 部署尚未在本机实际运行。
 
 
 ## 构建和运行
@@ -40,12 +40,12 @@ ctest --test-dir build --output-on-failure
 ./build/sylar/sqlite_demo
 ```
 
-默认构建核心框架，不要求安装 Redis、MySQL 或 ZooKeeper 开发包。[核心 CI](.github/workflows/core.yml) 在推送和 PR 时运行同样的 Release 构建与测试。需要对应扩展时在配置阶段加入 `-DSYLAR_WITH_REDIS=ON`、`-DSYLAR_WITH_MYSQL=ON`、`-DSYLAR_WITH_ZOOKEEPER=ON`；三个开关可分别启用。全部启用的 Release 构建通过 118 项测试，核心构建通过 115 项测试。若只构建示例而不运行测试，可加 `-DBUILD_TESTING=OFF`。
+默认构建核心框架，不要求安装 Redis、MySQL 或 ZooKeeper 开发包。[核心 CI](.github/workflows/core.yml) 在推送和 PR 时运行同样的 Release 构建与测试。需要对应扩展时在配置阶段加入 `-DSYLAR_WITH_REDIS=ON`、`-DSYLAR_WITH_MYSQL=ON`、`-DSYLAR_WITH_ZOOKEEPER=ON`；三个开关可分别启用。全部启用的 Release 构建通过 119 项测试，核心构建通过 116 项测试。若只构建示例而不运行测试，可加 `-DBUILD_TESTING=OFF`。
 
-也可以用 `./build/sylar/echo_server 9000 4` 指定端口与 I/O 工作线程数。按 Ctrl+C 或发送 SIGTERM 停止服务。示例配置见 [conf/echo.yml](conf/echo.yml)。HTTP 示例提供 /、/health、/ready、/instance 和 /echo，可用 `curl http://127.0.0.1:8080/health` 检查。HTTPS 可用 `http_server 8443 4 --tls cert.pem key.pem` 启动，客户端用 `http_client https://127.0.0.1:8443/health --ca cert.pem` 验证自签名证书；普通 CA 证书无需 `--ca`。
+也可以用 `./build/sylar/echo_server 9000 4` 指定端口与 I/O 工作线程数。按 Ctrl+C 或发送 SIGTERM 停止服务。示例配置见 [conf/echo.yml](conf/echo.yml)。HTTP 示例提供 /、/health、/ready、/instance、/metrics 和 /echo，可用 `curl http://127.0.0.1:8080/health` 检查。HTTPS 可用 `http_server 8443 4 --tls cert.pem key.pem` 启动，客户端用 `http_client https://127.0.0.1:8443/health --ca cert.pem` 验证自签名证书；普通 CA 证书无需 `--ca`。
 
 ## 验证与性能
 
-全部扩展开启后的 Release 构建有 118 项测试通过，包含 Fiber、socketpair、定时器、TCP 回环、跨线程投递和应用停机。C++ epoll 压测工具与复现命令见 [TCP echo 基准](docs/echo_benchmark.md)，HTTP/1.1 的独立测量见 [HTTP 基准](docs/http_benchmark.md)。在同一台 WSL 主机、4 个并行压测进程、1000 个连接、每轮 10 万次 64 字节回显的测试中，4 工作线程版本约 **31 万请求/秒**（10 轮中位数）；单线程版本约 **4.2 万请求/秒**（3 轮中位数）。压测端和服务端同机运行，该数据不代表独立压测机上的极限性能。
+全部扩展开启后的 Release 构建有 119 项测试通过，包含 Fiber、socketpair、定时器、TCP 回环、跨线程投递和应用停机。C++ epoll 压测工具与复现命令见 [TCP echo 基准](docs/echo_benchmark.md)，HTTP/1.1 的独立测量见 [HTTP 基准](docs/http_benchmark.md)。在同一台 WSL 主机、4 个并行压测进程、1000 个连接、每轮 10 万次 64 字节回显的测试中，4 工作线程版本约 **31 万请求/秒**（10 轮中位数）；单线程版本约 **4.2 万请求/秒**（3 轮中位数）。压测端和服务端同机运行，该数据不代表独立压测机上的极限性能。
 
 当前交付范围和已知限制见[开发计划](docs/roadmap.md)。原版 sylar 的完整模块对照与剩余工作见[模块状态](docs/module_status.md)。WebSocket 协议边界见[WebSocket 文档](docs/websocket.md)。其他外部服务集成仍在开发中；Hook 尚未覆盖全部 POSIX 调用。

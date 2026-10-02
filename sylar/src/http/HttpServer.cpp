@@ -71,6 +71,7 @@ namespace
 TcpServer::Handler makeHandler(
     std::shared_ptr<ServletDispatch> dispatch,
     std::shared_ptr<WebSocketRouteRegistry> ws_routes,
+    std::shared_ptr<std::atomic_bool> draining,
     std::shared_ptr<TlsContext> tls
 )
 {
@@ -80,6 +81,7 @@ TcpServer::Handler makeHandler(
     }
     return [dispatch = std::move(dispatch),
             ws_routes = std::move(ws_routes),
+            draining = std::move(draining),
             tls = std::move(tls)](IOManager& io, int fd)
     {
         try
@@ -161,7 +163,6 @@ TcpServer::Handler makeHandler(
                     }
                 }
 
-                const bool keep_alive = request.keepAlive();
                 HttpResponse response;
                 try
                 {
@@ -173,6 +174,10 @@ TcpServer::Handler makeHandler(
                     response.reason = "Internal Server Error";
                     response.body = "500 Internal Server Error\n";
                 }
+                const bool keep_alive = request.keepAlive() &&
+                                        !draining->load(
+                                            std::memory_order_acquire
+                                        );
                 session.sendResponse(
                     response,
                     keep_alive,
@@ -200,9 +205,15 @@ HttpServer::HttpServer(
     std::shared_ptr<TlsContext> tls
 )
     : m_wsRoutes(std::make_shared<WebSocketRouteRegistry>())
+    , m_draining(std::make_shared<std::atomic_bool>(false))
     , m_tcp(
           io,
-          makeHandler(std::move(dispatch), m_wsRoutes, std::move(tls))
+          makeHandler(
+              std::move(dispatch),
+              m_wsRoutes,
+              m_draining,
+              std::move(tls)
+          )
       )
 {
 }
@@ -214,10 +225,16 @@ HttpServer::HttpServer(
     std::shared_ptr<TlsContext> tls
 )
     : m_wsRoutes(std::make_shared<WebSocketRouteRegistry>())
+    , m_draining(std::make_shared<std::atomic_bool>(false))
     , m_tcp(
           acceptor,
           workers,
-          makeHandler(std::move(dispatch), m_wsRoutes, std::move(tls))
+          makeHandler(
+              std::move(dispatch),
+              m_wsRoutes,
+              m_draining,
+              std::move(tls)
+          )
       )
 {
 }
@@ -246,7 +263,38 @@ void HttpServer::start(const std::vector<Address>& addresses)
 
 void HttpServer::stop()
 {
+    beginDrain();
     m_tcp.stop();
+}
+
+void HttpServer::beginDrain() noexcept
+{
+    m_draining->store(true, std::memory_order_release);
+}
+
+bool HttpServer::draining() const noexcept
+{
+    return m_draining->load(std::memory_order_acquire);
+}
+
+void HttpServer::setMaxConnections(std::size_t limit)
+{
+    m_tcp.setMaxConnections(limit);
+}
+
+std::size_t HttpServer::maxConnections() const noexcept
+{
+    return m_tcp.maxConnections();
+}
+
+std::size_t HttpServer::activeConnections() const noexcept
+{
+    return m_tcp.activeConnections();
+}
+
+std::size_t HttpServer::rejectedConnections() const noexcept
+{
+    return m_tcp.rejectedConnections();
 }
 
 std::uint16_t HttpServer::localPort() const

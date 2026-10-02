@@ -42,6 +42,14 @@ add_test(
 )
 set_tests_properties(HttpCluster.IndependentReplicas PROPERTIES TIMEOUT 12)
 
+add_test(
+    NAME HttpApp.AdmissionAndDrain
+    COMMAND Python3::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/test_http_drain_app.py"
+        $<TARGET_FILE:http_server>
+)
+set_tests_properties(HttpApp.AdmissionAndDrain PROPERTIES TIMEOUT 12)
+
 find_program(OPENSSL_EXECUTABLE openssl)
 if(OPENSSL_EXECUTABLE)
     add_test(

@@ -1,8 +1,10 @@
+#include <signal.h>
 #include <sys/signalfd.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -36,6 +38,12 @@ unsigned parsePositive(std::string_view text)
         throw std::invalid_argument("expected positive number");
     }
     return result;
+}
+
+unsigned envPositive(const char* name, unsigned fallback)
+{
+    const char* value = std::getenv(name);
+    return value && *value ? parsePositive(value) : fallback;
 }
 
 std::string instanceId()
@@ -97,17 +105,6 @@ std::shared_ptr<sylar::ServletDispatch> routes(std::string instance_id
         )
     );
     dispatch->addExact(
-        "/ready",
-        std::make_shared<sylar::FunctionServlet>(
-            [](const sylar::HttpRequest&)
-            {
-                sylar::HttpResponse response;
-                response.body = "ready\n";
-                return response;
-            }
-        )
-    );
-    dispatch->addExact(
         "/instance",
         std::make_shared<sylar::FunctionServlet>(
             [instance_id = std::move(instance_id
@@ -160,16 +157,92 @@ int main(int argc, char** argv)
             );
         }
 
-        sylar::SignalFd signals;
+        const auto max_connections = envPositive(
+            "SYLAR_MAX_CONNECTIONS",
+            4096
+        );
+        const auto drain_timeout_ms = envPositive(
+            "SYLAR_DRAIN_TIMEOUT_MS",
+            10000
+        );
+        if (max_connections > 1000000 || drain_timeout_ms > 60000)
+        {
+            throw std::invalid_argument(
+                "invalid connection limit or drain timeout"
+            );
+        }
+
+        sylar::SignalFd signals(true);
         sylar::IOManager io;
         sylar::IOManagerPool pool(workers);
         auto tls = tls_mode
                        ? sylar::TlsContext::server(argv[4], argv[5])
                        : std::shared_ptr<sylar::TlsContext>{};
         const auto instance_id = instanceId();
-        sylar::HttpServer
-            server(io, pool, routes(instance_id), std::move(tls));
-        server.addWebSocket(
+        auto dispatch = routes(instance_id);
+        auto server = std::make_shared<sylar::HttpServer>(
+            io,
+            pool,
+            dispatch,
+            std::move(tls)
+        );
+        server->setMaxConnections(max_connections);
+        std::weak_ptr<sylar::HttpServer> server_weak = server;
+        dispatch->addExact(
+            "/ready",
+            std::make_shared<sylar::FunctionServlet>(
+                [server_weak](const sylar::HttpRequest&)
+                {
+                    sylar::HttpResponse response;
+                    const auto current = server_weak.lock();
+                    if (!current || current->draining())
+                    {
+                        response.status = 503;
+                        response.reason = "Service Unavailable";
+                        response.body = "draining\n";
+                    }
+                    else
+                    {
+                        response.body = "ready\n";
+                    }
+                    return response;
+                }
+            )
+        );
+        dispatch->addExact(
+            "/metrics",
+            std::make_shared<sylar::FunctionServlet>(
+                [server_weak](const sylar::HttpRequest&)
+                {
+                    sylar::HttpResponse response;
+                    const auto current = server_weak.lock();
+                    if (!current)
+                    {
+                        response.status = 503;
+                        response.reason = "Service Unavailable";
+                        return response;
+                    }
+                    response.headers["Content-Type"] =
+                        "text/plain; version=0.0.4";
+                    response.body =
+                        "# TYPE sylar_tcp_active_connections gauge\n"
+                        "sylar_tcp_active_connections " +
+                        std::to_string(current->activeConnections()) +
+                        "\n# TYPE "
+                        "sylar_tcp_rejected_connections_total "
+                        "counter\n"
+                        "sylar_tcp_rejected_connections_total " +
+                        std::to_string(current->rejectedConnections()
+                        ) +
+                        "\n# TYPE sylar_tcp_connection_limit gauge\n"
+                        "sylar_tcp_connection_limit " +
+                        std::to_string(current->maxConnections()) +
+                        "\n";
+                    return response;
+                }
+            )
+        );
+        server->addWebSocket(
             "/ws",
             [](sylar::WebSocketSession& session,
                const sylar::WebSocketMessage& message)
@@ -185,11 +258,13 @@ int main(int argc, char** argv)
                 }
             }
         );
-        server.start("0.0.0.0", static_cast<std::uint16_t>(port));
+        server->start("0.0.0.0", static_cast<std::uint16_t>(port));
         std::cout << (tls_mode ? "https_server" : "http_server")
-                  << " listening on port " << server.localPort()
+                  << " listening on port " << server->localPort()
                   << " workers=" << workers
-                  << " instance=" << instance_id << std::endl;
+                  << " instance=" << instance_id
+                  << " max_connections=" << max_connections
+                  << std::endl;
         io.schedule(
             [&]
             {
@@ -200,7 +275,27 @@ int main(int argc, char** argv)
                     if (::read(signals.get(), &info, sizeof(info)) ==
                         sizeof(info))
                     {
-                        server.stop();
+                        server->beginDrain();
+                        if (info.ssi_signo == SIGUSR1)
+                        {
+                            std::cout << "http_server draining"
+                                      << std::endl;
+                            continue;
+                        }
+                        server->stop();
+                        const auto
+                            deadline = std::chrono::steady_clock::now(
+                                       ) +
+                                       std::chrono::milliseconds(
+                                           drain_timeout_ms
+                                       );
+                        while (server->activeConnections() != 0 &&
+                               std::chrono::steady_clock::now() <
+                                   deadline)
+                        {
+                            io.sleepFor(std::chrono::milliseconds(25)
+                            );
+                        }
                         io.requestStop();
                         return;
                     }
@@ -208,7 +303,7 @@ int main(int argc, char** argv)
             }
         );
         io.runForever();
-        server.stop();
+        server->stop();
         pool.stop();
         std::cout << "http_server stopped" << std::endl;
     }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -38,6 +39,11 @@ public:
     void start(const Address& address);
     void start(const std::vector<Address>& addresses);
     void stop();
+    // Set before start(); zero keeps the listener unbounded.
+    void setMaxConnections(std::size_t limit);
+    std::size_t maxConnections() const noexcept;
+    std::size_t activeConnections() const noexcept;
+    std::size_t rejectedConnections() const noexcept;
     std::uint16_t localPort() const;
     std::vector<Address> localAddresses() const;
     bool running() const;

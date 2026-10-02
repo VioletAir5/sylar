@@ -15,10 +15,12 @@ flowchart LR
 
 ## 副本接口与生命周期
 
-- `GET /health`：仅证明当前进程可处理 HTTP；用于 liveness/startup。
-- `GET /ready`：当前示例启动后返回 200；用于 readiness。它**不检测**外部数据库，也不代表已有连接能无损迁移。
+- `GET /health`：仅证明当前进程可处理 HTTP；用于 startup 和人工检查。liveness 使用进程存活检查，避免满额时 HTTP 探针触发重启。
+- `GET /ready`：正常时返回 200，收到预排空信号后返回 503；满额时探针也可能被关闭。它**不检测**外部数据库，也不代表已有连接能无损迁移。
 - `GET /instance`：返回 `SYLAR_INSTANCE_ID`，否则使用 `HOSTNAME`，最后回退到 `local`；用于观察负载分配。只接受长度不超过 128 的 ASCII 字母、数字、点、下划线或短横线。
-- `SIGTERM`：现有服务停止接受新连接并停止 I/O worker；等待中的 I/O 可能被取消。配置的 `preStop` 5 秒给 Service 的 endpoint 更新留时间，**不能保证**已有请求全部完成。
+- `GET /metrics`：当前活动连接、累计拒绝连接和连接上限。
+- `SIGUSR1`：进入排空状态，readiness 变为 503，新完成的 HTTP 响应关闭 keep-alive；Kubernetes `preStop` 随后等待 5 秒供 endpoint 状态传播。
+- `SIGTERM`：停止监听，默认等待活动连接最多 10 秒，然后停止 worker。截止后未完成的 I/O 可能被取消。详细状态机和限制见[连接容量与排空](admission_and_drain.md)。
 
 HTTP 示例路由没有进程内会话状态，因而可以横向复制。SQLite 本地文件、进程内配置或日志不能当成跨副本共享状态；需要持久化时应由应用明确接入外部 MySQL/Redis 等适配器，并定义一致性和故障语义。仓库当前没有跨副本 WebSocket 广播、分布式事务或自动请求重放。
 
@@ -64,7 +66,7 @@ kubectl run sylar-probe --rm -i --restart=Never --image=busybox:1.36 -- \
 
 多次新连接可能命中不同副本，但小样本不保证覆盖每个副本；结合 `kubectl get pods -o wide` 和 EndpointSlice 检查拓扑。
 
-Deployment 配置 3 个副本、滚动更新 `maxUnavailable: 0`、健康探针、资源请求/限制和基于主机的尽力分散；PodDisruptionBudget 对遵循 Eviction API 的自愿中断要求至少 2 个副本可用；Deployment 的滚动更新由自身策略控制，PDB 不直接约束它。单节点集群仍可调度所有副本；只有运行在不同节点上，才能验证节点级故障容忍。Service 是集群内入口；公网接入、TLS 终止与流量策略需要另配 Ingress/Gateway。滚动更新前应验证长连接排空策略，现有示例尚不提供无损迁移。5 秒 preStop 计入 20 秒的总终止宽限期。
+Deployment 配置 3 个副本、滚动更新 `maxUnavailable: 0`、健康探针、资源请求/限制和基于主机的尽力分散；PodDisruptionBudget 对遵循 Eviction API 的自愿中断要求至少 2 个副本可用；Deployment 的滚动更新由自身策略控制，PDB 不直接约束它。单节点集群仍可调度所有副本；只有运行在不同节点上，才能验证节点级故障容忍。Service 是集群内入口；公网接入、TLS 终止与流量策略需要另配 Ingress/Gateway。滚动更新前应验证长连接排空策略，现有示例尚不提供无损迁移。5 秒 preStop 计入 20 秒的总终止宽限期。连接上限默认 4096；满额会拒绝新 TCP 连接，HTTP readiness 也可能无法接入。liveness 使用进程存活检查，避免高负载时的重启风暴，但不能检测事件循环死锁。
 
 本开发环境没有 Docker 或 kubectl；这里只验证了 Dockerfile/清单的静态内容与本机多进程行为，**未执行镜像构建或 Kubernetes 端到端部署**。
 
