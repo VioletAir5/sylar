@@ -76,8 +76,8 @@ std::string instanceId()
     return id;
 }
 
-std::shared_ptr<sylar::ServletDispatch> routes(std::string instance_id
-)
+std::shared_ptr<sylar::ServletDispatch>
+routes(std::string instance_id, unsigned demo_work_ms)
 {
     auto dispatch = std::make_shared<sylar::ServletDispatch>();
     dispatch->addExact(
@@ -104,6 +104,23 @@ std::shared_ptr<sylar::ServletDispatch> routes(std::string instance_id
             }
         )
     );
+    if (demo_work_ms != 0)
+    {
+        dispatch->addExact(
+            "/work",
+            std::make_shared<sylar::FunctionServlet>(
+                [demo_work_ms](const sylar::HttpRequest&)
+                {
+                    sylar::IOManager::GetThis()->sleepFor(
+                        std::chrono::milliseconds(demo_work_ms)
+                    );
+                    sylar::HttpResponse response;
+                    response.body = "done\n";
+                    return response;
+                }
+            )
+        );
+    }
     dispatch->addExact(
         "/instance",
         std::make_shared<sylar::FunctionServlet>(
@@ -161,11 +178,33 @@ int main(int argc, char** argv)
             "SYLAR_MAX_CONNECTIONS",
             4096
         );
+        const auto max_requests = envPositive(
+            "SYLAR_MAX_INFLIGHT_REQUESTS",
+            1024
+        );
+        const auto demo_work_ms = envPositive(
+            "SYLAR_DEMO_WORK_MS",
+            0
+        );
+        const char* adaptive_value = std::getenv(
+            "SYLAR_ADAPTIVE_CONCURRENCY"
+        );
+        const bool adaptive = adaptive_value &&
+                              std::string_view(adaptive_value) == "1";
+        if (adaptive_value &&
+            std::string_view(adaptive_value) != "0" &&
+            std::string_view(adaptive_value) != "1")
+        {
+            throw std::invalid_argument(
+                "invalid adaptive concurrency flag"
+            );
+        }
         const auto drain_timeout_ms = envPositive(
             "SYLAR_DRAIN_TIMEOUT_MS",
             10000
         );
-        if (max_connections > 1000000 || drain_timeout_ms > 60000)
+        if (max_connections > 1000000 || max_requests > 1000000 ||
+            drain_timeout_ms > 60000 || demo_work_ms > 1000)
         {
             throw std::invalid_argument(
                 "invalid connection limit or drain timeout"
@@ -179,12 +218,23 @@ int main(int argc, char** argv)
                        ? sylar::TlsContext::server(argv[4], argv[5])
                        : std::shared_ptr<sylar::TlsContext>{};
         const auto instance_id = instanceId();
-        auto dispatch = routes(instance_id);
+        auto dispatch = routes(instance_id, demo_work_ms);
+        auto limiter = std::make_shared<sylar::RequestLimiter>(
+            sylar::RequestLimiter::Options{
+                .initial = max_requests,
+                .minimum = adaptive ? std::max(1U, max_requests / 4)
+                                    : max_requests,
+                .maximum = max_requests,
+                .window = 64,
+                .adaptive = adaptive,
+            }
+        );
         auto server = std::make_shared<sylar::HttpServer>(
             io,
             pool,
             dispatch,
-            std::move(tls)
+            std::move(tls),
+            std::move(limiter)
         );
         server->setMaxConnections(max_connections);
         std::weak_ptr<sylar::HttpServer> server_weak = server;
@@ -237,6 +287,29 @@ int main(int argc, char** argv)
                         "\n# TYPE sylar_tcp_connection_limit gauge\n"
                         "sylar_tcp_connection_limit " +
                         std::to_string(current->maxConnections()) +
+                        "\n";
+                    const auto request_stats = current->requestStats(
+                    );
+                    response.body +=
+                        "# TYPE sylar_http_inflight_requests gauge\n"
+                        "sylar_http_inflight_requests " +
+                        std::to_string(request_stats.in_flight) +
+                        "\n# TYPE sylar_http_request_limit gauge\n"
+                        "sylar_http_request_limit " +
+                        std::to_string(request_stats.limit) +
+                        "\n# TYPE sylar_http_rejected_requests_total "
+                        "counter\n"
+                        "sylar_http_rejected_requests_total " +
+                        std::to_string(request_stats.rejected) +
+                        "\n# TYPE "
+                        "sylar_http_completed_requests_total "
+                        "counter\n"
+                        "sylar_http_completed_requests_total " +
+                        std::to_string(request_stats.completed) +
+                        "\nsylar_http_adaptive_concurrency_enabled " +
+                        std::to_string(
+                            request_stats.adaptive ? 1 : 0
+                        ) +
                         "\n";
                     const auto workers = pool.diagnostics();
                     for (std::size_t index = 0;
@@ -315,7 +388,8 @@ int main(int argc, char** argv)
                   << " workers=" << workers
                   << " instance=" << instance_id
                   << " max_connections=" << max_connections
-                  << std::endl;
+                  << " max_requests=" << max_requests
+                  << " adaptive=" << (adaptive ? 1 : 0) << std::endl;
         io.schedule(
             [&]
             {

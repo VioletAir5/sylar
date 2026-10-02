@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <span>
@@ -11,6 +12,7 @@
 #include "net/TcpServer.hpp"
 
 #include "fiber/IOManager.hpp"
+#include "fiber/IOManagerPool.hpp"
 #include "fiber/RequestContext.hpp"
 #include "http/HttpClient.hpp"
 #include "http/HttpServer.hpp"
@@ -489,4 +491,61 @@ TEST(HttpClientTest, RejectsInvalidChunkedTrailer)
         }
     );
     io.run();
+}
+
+TEST(HttpServerTest, RejectsOverlappingRequestsWith503)
+{
+    sylar::IOManager acceptor;
+    sylar::IOManagerPool workers(2);
+    auto routes = std::make_shared<sylar::ServletDispatch>();
+    std::atomic_bool entered{false};
+    routes->addExact(
+        "/slow",
+        std::make_shared<sylar::FunctionServlet>(
+            [&](const sylar::HttpRequest&)
+            {
+                entered.store(true);
+                sylar::IOManager::GetThis()->sleepFor(50ms);
+                sylar::HttpResponse response;
+                response.body = "done";
+                return response;
+            }
+        )
+    );
+    auto limiter = std::make_shared<sylar::RequestLimiter>(
+        sylar::RequestLimiter::Options{
+            .initial = 1,
+            .minimum = 1,
+            .maximum = 1,
+            .window = 4,
+        }
+    );
+    sylar::HttpServer server(acceptor, workers, routes, {}, limiter);
+    server.start("127.0.0.1", 0);
+    const auto uri = sylar::Uri::parse(
+        "http://127.0.0.1:" + std::to_string(server.localPort()) +
+        "/slow"
+    );
+    sylar::HttpResponse first;
+    sylar::HttpResponse second;
+    acceptor.schedule(
+        [&] { first = sylar::HttpClient::request(acceptor, uri); }
+    );
+    acceptor.schedule(
+        [&]
+        {
+            while (!entered.load())
+            {
+                acceptor.sleepFor(1ms);
+            }
+            second = sylar::HttpClient::request(acceptor, uri);
+            server.stop();
+        }
+    );
+    acceptor.run();
+    workers.stop();
+    EXPECT_EQ(first.status, 200);
+    EXPECT_EQ(second.status, 503);
+    EXPECT_EQ(limiter->snapshot().rejected, 1);
+    EXPECT_EQ(limiter->snapshot().in_flight, 0);
 }

@@ -13,6 +13,7 @@
 
 #include "fiber/IOManager.hpp"
 #include "fiber/IOManagerPool.hpp"
+#include "http/RequestLimiter.hpp"
 #include "http/Servlet.hpp"
 #include "http/WebSocket.hpp"
 
@@ -30,13 +31,15 @@ public:
     HttpServer(
         IOManager& io,
         std::shared_ptr<ServletDispatch> dispatch,
-        std::shared_ptr<TlsContext> tls = {}
+        std::shared_ptr<TlsContext> tls = {},
+        std::shared_ptr<RequestLimiter> limiter = {}
     );
     HttpServer(
         IOManager& acceptor,
         IOManagerPool& workers,
         std::shared_ptr<ServletDispatch> dispatch,
-        std::shared_ptr<TlsContext> tls = {}
+        std::shared_ptr<TlsContext> tls = {},
+        std::shared_ptr<RequestLimiter> limiter = {}
     );
 
     void addWebSocket(std::string path, WebSocketHandler handler);
@@ -51,12 +54,14 @@ public:
     std::size_t maxConnections() const noexcept;
     std::size_t activeConnections() const noexcept;
     std::size_t rejectedConnections() const noexcept;
+    RequestLimiter::Snapshot requestStats() const noexcept;
     std::uint16_t localPort() const;
     std::vector<Address> localAddresses() const;
 
 private:
     std::shared_ptr<WebSocketRouteRegistry> m_wsRoutes;
     std::shared_ptr<std::atomic_bool> m_draining;
+    std::shared_ptr<RequestLimiter> m_limiter;
     TcpServer m_tcp;
 };
 

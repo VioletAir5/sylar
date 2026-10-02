@@ -73,7 +73,8 @@ TcpServer::Handler makeHandler(
     std::shared_ptr<ServletDispatch> dispatch,
     std::shared_ptr<WebSocketRouteRegistry> ws_routes,
     std::shared_ptr<std::atomic_bool> draining,
-    std::shared_ptr<TlsContext> tls
+    std::shared_ptr<TlsContext> tls,
+    std::shared_ptr<RequestLimiter> limiter
 )
 {
     if (!dispatch)
@@ -83,7 +84,8 @@ TcpServer::Handler makeHandler(
     return [dispatch = std::move(dispatch),
             ws_routes = std::move(ws_routes),
             draining = std::move(draining),
-            tls = std::move(tls)](IOManager& io, int fd)
+            tls = std::move(tls),
+            limiter = std::move(limiter)](IOManager& io, int fd)
     {
         try
         {
@@ -172,6 +174,25 @@ TcpServer::Handler makeHandler(
                     }
                 }
 
+                std::optional<RequestLimiter::Permit> permit;
+                if (limiter)
+                {
+                    permit = limiter->tryAcquire();
+                    if (!permit)
+                    {
+                        HttpResponse overloaded;
+                        overloaded.status = 503;
+                        overloaded.reason = "Service Unavailable";
+                        overloaded.headers["Retry-After"] = "1";
+                        overloaded.body = "503 overloaded\n";
+                        session.sendResponse(
+                            overloaded,
+                            false,
+                            request.method == "HEAD"
+                        );
+                        return;
+                    }
+                }
                 HttpResponse response;
                 try
                 {
@@ -211,17 +232,20 @@ TcpServer::Handler makeHandler(
 HttpServer::HttpServer(
     IOManager& io,
     std::shared_ptr<ServletDispatch> dispatch,
-    std::shared_ptr<TlsContext> tls
+    std::shared_ptr<TlsContext> tls,
+    std::shared_ptr<RequestLimiter> limiter
 )
     : m_wsRoutes(std::make_shared<WebSocketRouteRegistry>())
     , m_draining(std::make_shared<std::atomic_bool>(false))
+    , m_limiter(std::move(limiter))
     , m_tcp(
           io,
           makeHandler(
               std::move(dispatch),
               m_wsRoutes,
               m_draining,
-              std::move(tls)
+              std::move(tls),
+              m_limiter
           )
       )
 {
@@ -231,10 +255,12 @@ HttpServer::HttpServer(
     IOManager& acceptor,
     IOManagerPool& workers,
     std::shared_ptr<ServletDispatch> dispatch,
-    std::shared_ptr<TlsContext> tls
+    std::shared_ptr<TlsContext> tls,
+    std::shared_ptr<RequestLimiter> limiter
 )
     : m_wsRoutes(std::make_shared<WebSocketRouteRegistry>())
     , m_draining(std::make_shared<std::atomic_bool>(false))
+    , m_limiter(std::move(limiter))
     , m_tcp(
           acceptor,
           workers,
@@ -242,7 +268,8 @@ HttpServer::HttpServer(
               std::move(dispatch),
               m_wsRoutes,
               m_draining,
-              std::move(tls)
+              std::move(tls),
+              m_limiter
           )
       )
 {
@@ -304,6 +331,12 @@ std::size_t HttpServer::activeConnections() const noexcept
 std::size_t HttpServer::rejectedConnections() const noexcept
 {
     return m_tcp.rejectedConnections();
+}
+
+RequestLimiter::Snapshot HttpServer::requestStats() const noexcept
+{
+    return m_limiter ? m_limiter->snapshot()
+                     : RequestLimiter::Snapshot{};
 }
 
 std::uint16_t HttpServer::localPort() const
