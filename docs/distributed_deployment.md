@@ -22,7 +22,7 @@ flowchart LR
 - `SIGUSR1`：进入排空状态，readiness 变为 503，新完成的 HTTP 响应关闭 keep-alive；Kubernetes `preStop` 随后等待 5 秒供 endpoint 状态传播。
 - `SIGTERM`：停止监听，默认等待活动连接最多 10 秒，然后停止 worker。截止后未完成的 I/O 可能被取消。详细状态机和限制见[连接容量与排空](admission_and_drain.md)。
 
-HTTP 示例路由没有进程内会话状态，因而可以横向复制。SQLite 本地文件、进程内配置或日志不能当成跨副本共享状态；需要持久化时应由应用明确接入外部 MySQL/Redis 等适配器，并定义一致性和故障语义。仓库当前没有跨副本 WebSocket 广播、分布式事务或自动请求重放。
+HTTP 示例路由没有进程内会话状态，因而可以横向复制。SQLite 本地文件、进程内配置或日志不能当成跨副本共享状态；需要持久化时应由应用明确接入外部 MySQL/Redis 等适配器，并定义一致性和故障语义。仓库另有 [Redis Streams 跨副本 WebSocket 演示](redis_stream_cluster.md)，按 ID 补读与保留窗口缺口由双进程测试覆盖；分布式事务与通用自动请求重放未实现。
 
 ## 本机验证
 

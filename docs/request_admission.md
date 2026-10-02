@@ -1,6 +1,6 @@
 # HTTP 请求级并发准入
 
-`RequestLimiter` 在 HTTP 解析完成后、Servlet 执行前获取 RAII permit。超出上限时返回 503、`Retry-After: 1` 并关闭连接。TCP 连接硬上限仍独立生效；WebSocket 升级不使用 HTTP permit。permit 在 Servlet 执行和响应构造后释放，不覆盖慢客户端的响应写入。
+`RequestLimiter` 在 HTTP 解析完成后、Servlet 执行前获取 RAII permit。超出上限时返回 503、`Retry-After: 1` 并关闭连接。TCP 连接硬上限仍独立生效；WebSocket 升级不使用 HTTP permit。permit 持有到响应写入结束、循环作用域退出或异常展开，因此覆盖 Servlet 执行、响应构造和发送；慢客户端写入也会占用在途名额并影响延迟反馈。
 
 `SYLAR_MAX_INFLIGHT_REQUESTS` 默认 1024，上限 1000000。`SYLAR_ADAPTIVE_CONCURRENCY=1` 启用实验性的延迟反馈控制：每 64 个完成请求构成一个窗口；平均延迟相对最低窗口增长 25% 且负载高时限额缩小 20%，饱和而未触发退避时缓慢增加；限额保持在初始值的四分之一到初始值之间。默认固定模式。`/metrics` 提供在途数、限额、拒绝数、完成数。该控制器未在多种真实负载下验证稳定性。
 

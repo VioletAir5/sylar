@@ -19,6 +19,10 @@
 
 请求级总超时与协作取消见[RequestContext](docs/request_context.md)。架构与接口见 [协程网络架构](docs/architecture.md)、[日志](docs/logging.md)、[配置](docs/configuration.md)。
 
+## 面试准备
+
+[面试准备入口](docs/interview/README.md)提供简历表述、60 秒/3 分钟项目介绍、26 个重点追问、8 分钟演示和七天训练计划。材料基于真实代码与性能记录，包含当前设计边界。
+
 ## 多副本部署与面试演示
 
 HTTP 示例提供 `/ready`、`/instance` 和 `/metrics`，并支持连接容量控制与限时排空。多个独立进程可由 Kubernetes Service 分配新连接；仓库提供 [容器与三副本部署清单](docs/distributed_deployment.md) 和本机双进程集成测试。可离线打开 [交互式架构动画](docs/architecture_demo.html)，切换正常流量、容量满额、副本故障和滚动更新四个场景。[9 个开发问题与解决方法](docs/interview_problems.md) 给出对应代码、测量证据和仍未解决的限制。[连接容量与排空设计](docs/admission_and_drain.md)说明过载、探针与滚动更新的取舍。容器与 Kubernetes 部署尚未在本机实际运行。
@@ -48,4 +52,4 @@ ctest --test-dir build --output-on-failure
 
 全部扩展开启后的 Release 构建有 133 项测试通过，包含 Fiber、socketpair、定时器、TCP 回环、跨线程投递和应用停机。C++ epoll 压测工具与复现命令见 [TCP echo 基准](docs/echo_benchmark.md)，HTTP/1.1 的独立测量见 [HTTP 基准](docs/http_benchmark.md)，每 worker 的排队、epoll 与唤醒诊断见 [HTTP 工作线程诊断](docs/http_worker_diagnostics.md)。在同一台 WSL 主机、4 个并行压测进程、1000 个连接、每轮 10 万次 64 字节回显的测试中，4 工作线程版本约 **31 万请求/秒**（10 轮中位数）；单线程版本约 **4.2 万请求/秒**（3 轮中位数）。压测端和服务端同机运行，该数据不代表独立压测机上的极限性能。
 
-下一阶段的六个特色方向与验收条件见[架构迭代路线](docs/next_architecture.md)。当前交付范围和已知限制见[开发计划](docs/roadmap.md)。原版 sylar 的完整模块对照与剩余工作见[模块状态](docs/module_status.md)。WebSocket 协议边界见[WebSocket 文档](docs/websocket.md)。其他外部服务集成仍在开发中；Hook 尚未覆盖全部 POSIX 调用。
+六个特色方向与验收条件见[架构迭代路线](docs/next_architecture.md)，首版实现与局限可通过[面试材料](docs/interview/project_story.md)和对应功能文档核对。当前交付范围和已知限制见[开发计划](docs/roadmap.md)。原版 sylar 的完整模块对照与剩余工作见[模块状态](docs/module_status.md)。WebSocket 协议边界见[WebSocket 文档](docs/websocket.md)。其他外部服务集成仍在开发中；Hook 尚未覆盖全部 POSIX 调用。

@@ -26,4 +26,4 @@
 
 ## 部署层
 
-HTTP 示例现可无状态多副本运行；Kubernetes 清单提供三副本 Deployment、Service、探针与滚动更新设置。本机双进程测试覆盖副本身份与单副本退出后的独立可用性。镜像构建和真实 Kubernetes 运行尚未验收，跨副本 WebSocket 广播、共享状态一致性与无损连接排空未实现。详见 [多副本部署](distributed_deployment.md)。
+HTTP 示例现可无状态多副本运行；Kubernetes 清单提供三副本 Deployment、Service、探针与滚动更新设置。本机双进程测试覆盖副本身份与单副本退出后的独立可用性。镜像构建和真实 Kubernetes 运行尚未验收，已有 Redis Streams 跨副本 WebSocket 演示与重启补读测试，每副本最多 8 个阻塞订阅；共享状态一致性与无损连接迁移未实现。验证范围见 [Redis 双副本演示](redis_stream_cluster.md)与[多副本部署](distributed_deployment.md)。
