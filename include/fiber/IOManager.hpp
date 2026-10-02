@@ -22,6 +22,19 @@ namespace sylar
 class IOManager
 {
 public:
+    struct Diagnostics
+    {
+        bool enabled = false;
+        std::uint64_t posts = 0;
+        std::uint64_t post_queue = 0;
+        std::uint64_t waiter_registrations = 0;
+        std::uint64_t epoll_ctl_calls = 0;
+        std::uint64_t epoll_wait_calls = 0;
+        std::uint64_t epoll_wait_ns = 0;
+        std::uint64_t epoll_ready_events = 0;
+        std::uint64_t eventfd_wakeups = 0;
+    };
+
     enum class Event
     {
         Read,
@@ -70,6 +83,7 @@ public:
     void runForever();
     void run();
     std::size_t pendingEventCount() const;
+    Diagnostics diagnostics() const noexcept;
     static IOManager* GetThis() noexcept;
 
 private:
@@ -113,6 +127,7 @@ private:
     void cancelAllWaits();
 
     std::thread::id m_ownerThread;
+    bool m_diagnosticsEnabled = false;
     TimerManager m_timers;
     Scheduler m_scheduler;
     int m_epollFd = -1;
@@ -122,6 +137,14 @@ private:
     std::atomic<bool> m_stopRequested{false};
     std::unordered_map<int, FdContext> m_waiters;
     std::size_t m_pendingEvents = 0;
+    std::atomic_uint64_t m_postCount{0};
+    std::atomic_uint64_t m_postQueue{0};
+    std::atomic_uint64_t m_waiterRegistrations{0};
+    std::atomic_uint64_t m_epollCtlCalls{0};
+    std::atomic_uint64_t m_epollWaitCalls{0};
+    std::atomic_uint64_t m_epollWaitNs{0};
+    std::atomic_uint64_t m_epollReadyEvents{0};
+    std::atomic_uint64_t m_eventfdWakeups{0};
 };
 
 } // namespace sylar

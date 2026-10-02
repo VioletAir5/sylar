@@ -60,12 +60,39 @@ async def client(reader, writer, count):
         await writer.wait_closed()
 
 
+async def read_diagnostics(port):
+    reader, writer = await asyncio.open_connection(
+        "127.0.0.1", port
+    )
+    try:
+        writer.write(
+            b"GET /metrics HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+            b"Connection: close\r\n\r\n"
+        )
+        await writer.drain()
+        wire = await reader.read()
+        head, body = wire.split(b"\r\n\r\n", 1)
+        if not head.startswith(b"HTTP/1.1 200 OK"):
+            raise RuntimeError(f"metrics failed: {head!r}")
+        for line in body.decode().splitlines():
+            if line.startswith("sylar_io_"):
+                print(line)
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
 async def benchmark(args):
     port = free_port()
+    server_env = os.environ.copy()
+    if args.diagnostics:
+        server_env["SYLAR_IO_DIAGNOSTICS"] = "1"
     server = await asyncio.create_subprocess_exec(
         args.server, str(port), str(args.workers),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=server_env,
     )
     try:
         line = await asyncio.wait_for(server.stdout.readline(), 3)
@@ -99,6 +126,8 @@ async def benchmark(args):
                 f"server_vmhwm_kib={peak}"
             )
             print(stdout.decode().strip())
+            if args.diagnostics:
+                await read_diagnostics(port)
             return
         connections = await asyncio.wait_for(
             asyncio.gather(*[
@@ -133,6 +162,8 @@ async def benchmark(args):
             f"server_cpu_s={after_cpu - before_cpu:.3f} "
             f"server_vmhwm_kib={peak}"
         )
+        if args.diagnostics:
+            await read_diagnostics(port)
     finally:
         if server.returncode is None:
             server.terminate()
@@ -151,6 +182,7 @@ def main():
     parser.add_argument("--requests", type=int, default=100)
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument("--native-client")
+    parser.add_argument("--diagnostics", action="store_true")
     args = parser.parse_args()
     if (args.workers < 1 or args.clients < 1 or
             args.requests < 1 or args.clients > 2000):

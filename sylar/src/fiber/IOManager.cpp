@@ -7,6 +7,8 @@
 
 #include <array>
 #include <cerrno>
+#include <chrono>
+#include <cstdlib>
 #include <limits>
 #include <stdexcept>
 #include <system_error>
@@ -42,6 +44,13 @@ private:
 
 IOManager::IOManager()
     : m_ownerThread(std::this_thread::get_id())
+    , m_diagnosticsEnabled(
+          []
+          {
+              const char* value = std::getenv("SYLAR_IO_DIAGNOSTICS");
+              return value && value[0] == '1' && value[1] == '\0';
+          }()
+      )
     , m_epollFd(::epoll_create1(EPOLL_CLOEXEC))
 {
     if (m_epollFd < 0)
@@ -136,6 +145,10 @@ bool IOManager::updateInterest(
     }
     kernel_event.data.fd = fd;
 
+    if (m_diagnosticsEnabled)
+    {
+        m_epollCtlCalls.fetch_add(1, std::memory_order_relaxed);
+    }
     if (::epoll_ctl(
             m_epollFd,
             operation,
@@ -227,6 +240,10 @@ void IOManager::registerWait(
     slot.fiber_id = fiber->getId();
     slot.state = state;
     ++m_pendingEvents;
+    if (m_diagnosticsEnabled)
+    {
+        m_waiterRegistrations.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 IOManager::WaitResult IOManager::wait(
@@ -418,6 +435,10 @@ void IOManager::waitForEvents()
                       ? std::numeric_limits<int>::max()
                       : static_cast<int>(next->count());
     }
+    const auto
+        wait_start = m_diagnosticsEnabled
+                         ? std::chrono::steady_clock::now()
+                         : std::chrono::steady_clock::time_point{};
     int count;
     do
     {
@@ -437,11 +458,35 @@ void IOManager::waitForEvents()
             "epoll_wait"
         );
     }
+    if (m_diagnosticsEnabled)
+    {
+        m_epollWaitCalls.fetch_add(1, std::memory_order_relaxed);
+        m_epollReadyEvents.fetch_add(
+            static_cast<std::uint64_t>(count),
+            std::memory_order_relaxed
+        );
+        m_epollWaitNs.fetch_add(
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - wait_start
+                )
+                    .count()
+            ),
+            std::memory_order_relaxed
+        );
+    }
 
     for (int index = 0; index < count; ++index)
     {
         if (events[index].data.fd == m_wakeupFd)
         {
+            if (m_diagnosticsEnabled)
+            {
+                m_eventfdWakeups.fetch_add(
+                    1,
+                    std::memory_order_relaxed
+                );
+            }
             std::uint64_t counter;
             while (::read(m_wakeupFd, &counter, sizeof(counter)) ==
                    sizeof(counter))
@@ -490,6 +535,11 @@ void IOManager::post(std::function<void()> callback)
             throw std::logic_error("IOManager is stopping");
         }
         m_posts.push_back(std::move(callback));
+        if (m_diagnosticsEnabled)
+        {
+            m_postCount.fetch_add(1, std::memory_order_relaxed);
+            m_postQueue.fetch_add(1, std::memory_order_relaxed);
+        }
     }
     signalWakeup();
 }
@@ -509,6 +559,13 @@ void IOManager::drainPosts()
     {
         std::lock_guard lock(m_postMutex);
         pending.swap(m_posts);
+        if (m_diagnosticsEnabled)
+        {
+            m_postQueue.fetch_sub(
+                pending.size(),
+                std::memory_order_relaxed
+            );
+        }
     }
     for (auto& callback : pending)
     {
@@ -583,6 +640,32 @@ void IOManager::run()
         }
         waitForEvents();
     }
+}
+
+IOManager::Diagnostics IOManager::diagnostics() const noexcept
+{
+    return {
+        .enabled = m_diagnosticsEnabled,
+        .posts = m_postCount.load(std::memory_order_relaxed),
+        .post_queue = m_postQueue.load(std::memory_order_relaxed),
+        .waiter_registrations = m_waiterRegistrations.load(
+            std::memory_order_relaxed
+        ),
+        .epoll_ctl_calls = m_epollCtlCalls.load(
+            std::memory_order_relaxed
+        ),
+        .epoll_wait_calls = m_epollWaitCalls.load(
+            std::memory_order_relaxed
+        ),
+        .epoll_wait_ns = m_epollWaitNs.load(std::memory_order_relaxed
+        ),
+        .epoll_ready_events = m_epollReadyEvents.load(
+            std::memory_order_relaxed
+        ),
+        .eventfd_wakeups = m_eventfdWakeups.load(
+            std::memory_order_relaxed
+        ),
+    };
 }
 
 IOManager* IOManager::GetThis() noexcept

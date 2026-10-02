@@ -212,7 +212,7 @@ int main(int argc, char** argv)
         dispatch->addExact(
             "/metrics",
             std::make_shared<sylar::FunctionServlet>(
-                [server_weak](const sylar::HttpRequest&)
+                [server_weak, &pool](const sylar::HttpRequest&)
                 {
                     sylar::HttpResponse response;
                     const auto current = server_weak.lock();
@@ -238,6 +238,57 @@ int main(int argc, char** argv)
                         "sylar_tcp_connection_limit " +
                         std::to_string(current->maxConnections()) +
                         "\n";
+                    const auto workers = pool.diagnostics();
+                    for (std::size_t index = 0;
+                         index < workers.size();
+                         ++index)
+                    {
+                        const auto& stats = workers[index];
+                        const auto label = "{worker=\"" +
+                                           std::to_string(index) +
+                                           "\"} ";
+                        const auto append = [&](std::string_view name,
+                                                std::uint64_t value)
+                        {
+                            response.body += std::string(name) +
+                                             label +
+                                             std::to_string(value) +
+                                             "\n";
+                        };
+                        append(
+                            "sylar_io_diagnostics_enabled",
+                            stats.enabled ? 1 : 0
+                        );
+                        append("sylar_io_posts_total", stats.posts);
+                        append(
+                            "sylar_io_post_queue",
+                            stats.post_queue
+                        );
+                        append(
+                            "sylar_io_waiter_registrations_total",
+                            stats.waiter_registrations
+                        );
+                        append(
+                            "sylar_io_epoll_ctl_calls_total",
+                            stats.epoll_ctl_calls
+                        );
+                        append(
+                            "sylar_io_epoll_wait_calls_total",
+                            stats.epoll_wait_calls
+                        );
+                        append(
+                            "sylar_io_epoll_wait_nanoseconds_total",
+                            stats.epoll_wait_ns
+                        );
+                        append(
+                            "sylar_io_epoll_ready_events_total",
+                            stats.epoll_ready_events
+                        );
+                        append(
+                            "sylar_io_eventfd_wakeups_total",
+                            stats.eventfd_wakeups
+                        );
+                    }
                     return response;
                 }
             )

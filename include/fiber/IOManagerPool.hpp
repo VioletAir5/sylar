@@ -28,6 +28,7 @@ public:
     void post(std::function<void(IOManager&)> callback);
     void stop();
     std::size_t size() const noexcept;
+    std::vector<IOManager::Diagnostics> diagnostics();
 
 private:
     struct Worker;

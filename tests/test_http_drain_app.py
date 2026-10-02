@@ -17,11 +17,12 @@ def free_port():
         return probe.getsockname()[1]
 
 
-def launch(executable, limit):
+def launch(executable, limit, diagnostics=False):
     port = free_port()
     env = os.environ.copy()
     env["SYLAR_MAX_CONNECTIONS"] = str(limit)
     env["SYLAR_DRAIN_TIMEOUT_MS"] = "2000"
+    env["SYLAR_IO_DIAGNOSTICS"] = "1" if diagnostics else "0"
     process = subprocess.Popen(
         [executable, str(port), "2"],
         env=env,
@@ -72,6 +73,38 @@ def close_process(process):
     if process.poll() is None:
         process.kill()
     process.wait(timeout=3)
+
+
+def test_worker_diagnostics(executable):
+    process, port = launch(executable, 4, diagnostics=True)
+    try:
+        for _ in range(12):
+            assert get(port, "/health")[0] == 200
+        status, body, _ = get(port, "/metrics")
+        assert status == 200
+        lines = body.decode().splitlines()
+        for worker in range(2):
+            label = f'{{worker="{worker}"}}'
+            assert (
+                f"sylar_io_diagnostics_enabled{label} 1"
+                in lines
+            )
+            posts = [
+                int(line.rsplit(" ", 1)[1])
+                for line in lines
+                if line.startswith(f"sylar_io_posts_total{label} ")
+            ]
+            assert len(posts) == 1 and posts[0] > 0, lines
+            wakeups = [
+                int(line.rsplit(" ", 1)[1])
+                for line in lines
+                if line.startswith(
+                    f"sylar_io_eventfd_wakeups_total{label} "
+                )
+            ]
+            assert len(wakeups) == 1 and wakeups[0] > 0, lines
+    finally:
+        close_process(process)
 
 
 def test_capacity_and_readiness(executable):
@@ -172,6 +205,7 @@ def test_inflight_request_finishes(executable):
 
 
 if __name__ == "__main__":
+    test_worker_diagnostics(sys.argv[1])
     test_capacity_and_readiness(sys.argv[1])
     test_inflight_request_finishes(sys.argv[1])
     test_drain_deadline_is_bounded(sys.argv[1])

@@ -170,5 +170,20 @@ std::size_t IOManagerPool::size() const noexcept
 {
     return m_workers.size();
 }
+std::vector<IOManager::Diagnostics> IOManagerPool::diagnostics()
+{
+    std::vector<IOManager::Diagnostics> snapshots;
+    std::lock_guard pool_lock(m_mutex);
+    snapshots.reserve(m_workers.size());
+    for (const auto& worker : m_workers)
+    {
+        std::lock_guard worker_lock(worker->mutex);
+        snapshots.push_back(
+            worker->io ? worker->io->diagnostics()
+                       : IOManager::Diagnostics{}
+        );
+    }
+    return snapshots;
+}
 
 } // namespace sylar
