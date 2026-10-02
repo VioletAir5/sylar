@@ -71,3 +71,6 @@ Testing/
 # local files
 .clang-format
 .clangd
+# Python test imports
+__pycache__/
+*.pyc
