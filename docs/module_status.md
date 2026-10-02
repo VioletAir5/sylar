@@ -27,3 +27,9 @@
 ## 部署层
 
 HTTP 示例现可无状态多副本运行；Kubernetes 清单提供三副本 Deployment、Service、探针与滚动更新设置。本机双进程测试覆盖副本身份与单副本退出后的独立可用性。镜像构建和真实 Kubernetes 运行尚未验收，已有 Redis Streams 跨副本 WebSocket 演示与重启补读测试，每副本最多 8 个阻塞订阅；共享状态一致性与无损连接迁移未实现。验证范围见 [Redis 双副本演示](redis_stream_cluster.md)与[多副本部署](distributed_deployment.md)。
+
+## gRPC 微服务扩展
+
+gRPC 为本项目新增扩展，使用 `SYLAR_WITH_GRPC=ON` 开启，默认核心不依赖 gRPC。已有 versioned Protobuf 契约、独立 Catalog 服务、HTTP 网关、共享 channel、静态副本轮询和 CQ 到 Fiber 的完成适配。请求携带 deadline、协作取消和 request ID，在途调用有固定限额。10 项真实后端测试加 1 项进程故障测试已通过；所有扩展开启的 Release 回归为 144/144。
+
+服务端示例使用 gRPC 同步 handler 线程；网关异步等待使用本框架 Fiber。尚无动态注册发现、故障摘除、应用层重试、服务认证或 RPC 吞吐量基准。Compose 已提供但未在本机验收。架构和启动见 [gRPC 教程](grpc.md)。

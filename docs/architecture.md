@@ -22,3 +22,9 @@ flowchart LR
 多个 `http_server` 进程可以部署为独立 Pod。Kubernetes Service 根据 readiness 将**新 TCP 连接**转发到一个副本；每个副本内部保持上述线程与 Fiber 拓扑。应用路由应保持无状态，持久化数据须在外部系统中定义一致性和故障策略。Deployment、Service 和本机双进程测试见 [多副本部署](distributed_deployment.md)。
 
 面试时可直接打开 [交互式架构动画](architecture_demo.html) 切换正常、故障和滚动更新场景。该动画描述连接流向，不声称跨 Pod 会话迁移或无损请求重试。
+
+## 外部 gRPC 调用
+
+可选 `sylar_grpc` 模块把 gRPC 完成队列接入现有 epoll 等待机制。网关 Fiber 发起 unary RPC 后等待 per-call eventfd；共享 CQ 线程完成后发布状态并通知 fd，Fiber 回到原工作线程。CQ tag 持有请求与响应对象直到回收，允许调用方提前超时或停止 IOManager。该模块没有改变 Scheduler 的线程归属规则。
+
+微服务调用链为 HTTP 网关到两个独立 Catalog 副本，采用静态轮询、共享 channel、总预算和在途准入。目录服务使用 gRPC 自身的同步 handler 线程。详细时序、内存与取消约束见 [gRPC 架构](grpc.md)。
