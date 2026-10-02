@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package sylar.rpc.v1;
+
+// Versioned read-only contract. Removed field numbers must be reserved.
+service Catalog {
+  rpc GetProduct(ProductRequest) returns (ProductReply);
+}
+
+message ProductRequest {
+  uint64 product_id = 1;
+}
+
+message ProductReply {
+  uint64 product_id = 1;
+  string name = 2;
+  uint64 price_cents = 3;
+  string instance_id = 4;
+  string request_id = 5;
+}

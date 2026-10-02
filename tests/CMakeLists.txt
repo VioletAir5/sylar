@@ -11,9 +11,19 @@ if(SYLAR_TEST_SOURCES)
 
     foreach(test_source IN LISTS SYLAR_TEST_SOURCES)
         get_filename_component(test_name "${test_source}" NAME_WE)
+        if(test_name STREQUAL "test_grpc" AND NOT SYLAR_WITH_GRPC)
+            continue()
+        endif()
         add_executable("${test_name}" "${test_source}")
         target_link_libraries("${test_name}" PRIVATE sylar_core GTest::gtest_main)
-        gtest_discover_tests("${test_name}")
+        if(test_name STREQUAL "test_grpc")
+            target_link_libraries("${test_name}" PRIVATE sylar_grpc)
+        endif()
+        if(test_name STREQUAL "test_grpc")
+            gtest_discover_tests("${test_name}" PROPERTIES TIMEOUT 10)
+        else()
+            gtest_discover_tests("${test_name}")
+        endif()
     endforeach()
 endif()
 
@@ -149,4 +159,11 @@ if(SYLAR_WITH_ZOOKEEPER AND JAVA_EXECUTABLE AND
             $<TARGET_FILE:zk_demo>
     )
     set_tests_properties(ZooKeeperApp.NodesAndShutdown PROPERTIES TIMEOUT 30)
+endif()
+
+if(SYLAR_WITH_GRPC)
+    add_test(NAME GrpcCluster.GatewayAndFailures
+        COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/test_grpc_cluster.py"
+            $<TARGET_FILE:catalog_server> $<TARGET_FILE:rpc_gateway>)
+    set_tests_properties(GrpcCluster.GatewayAndFailures PROPERTIES TIMEOUT 30)
 endif()

@@ -1,0 +1,25 @@
+name: gRPC microservice tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  grpc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake g++ pkg-config libboost-context-dev libfmt-dev libyaml-cpp-dev \
+            libssl-dev libsqlite3-dev libgtest-dev openssl python3 \
+            libgrpc++-dev libprotobuf-dev protobuf-compiler protobuf-compiler-grpc
+      - name: Configure
+        run: cmake -S . -B build-grpc -DCMAKE_BUILD_TYPE=Release -DSYLAR_WITH_GRPC=ON
+      - name: Build
+        run: cmake --build build-grpc --parallel 2
+      - name: Test
+        run: ctest --test-dir build-grpc --output-on-failure --parallel 2

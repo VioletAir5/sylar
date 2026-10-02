@@ -30,6 +30,7 @@ file(GLOB_RECURSE SYLAR_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
 )
+list(FILTER SYLAR_SOURCES EXCLUDE REGEX "/src/rpc/")
 if(NOT SYLAR_WITH_REDIS)
     list(FILTER SYLAR_SOURCES EXCLUDE REGEX "/src/redis/")
 endif()
@@ -47,6 +48,10 @@ target_compile_options(sylar_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
 )
 
+if(SYLAR_WITH_GRPC)
+    add_subdirectory(rpc)
+endif()
+
 file(GLOB SYLAR_APPS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp"
@@ -59,6 +64,13 @@ foreach(app_source IN LISTS SYLAR_APPS)
        (app_name STREQUAL "zk_demo" AND NOT SYLAR_WITH_ZOOKEEPER))
         continue()
     endif()
+    if((app_name STREQUAL "catalog_server" OR app_name STREQUAL "rpc_gateway") AND NOT SYLAR_WITH_GRPC)
+        continue()
+    endif()
     add_executable("${app_name}" "${app_source}")
-    target_link_libraries("${app_name}" PRIVATE sylar_core)
+    if(app_name STREQUAL "catalog_server" OR app_name STREQUAL "rpc_gateway")
+        target_link_libraries("${app_name}" PRIVATE sylar_grpc)
+    else()
+        target_link_libraries("${app_name}" PRIVATE sylar_core)
+    endif()
 endforeach()
