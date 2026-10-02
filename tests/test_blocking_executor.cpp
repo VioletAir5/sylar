@@ -139,3 +139,93 @@ TEST(BlockingExecutorTest, StopCancelsWaitingFiber)
     io.runForever();
     EXPECT_TRUE(cancelled);
 }
+
+TEST(BlockingExecutorTest, DeadlineSkipsQueuedOperation)
+{
+    sylar::IOManager io;
+    sylar::BlockingExecutor blocking(1);
+    std::atomic<bool> second_ran{false};
+    bool timed_out = false;
+    auto context = sylar::RequestContext::withTimeout(
+        std::chrono::milliseconds(10)
+    );
+    io.schedule(
+        [&]
+        {
+            blocking.await(
+                io,
+                [] {
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(60)
+                    );
+                }
+            );
+        }
+    );
+    io.schedule(
+        [&]
+        {
+            try
+            {
+                blocking.await(
+                    io,
+                    context,
+                    [&] { second_ran.store(true); }
+                );
+            }
+            catch (const std::system_error& error)
+            {
+                timed_out = error.code().value() == ETIMEDOUT;
+            }
+        }
+    );
+    io.run();
+    EXPECT_TRUE(timed_out);
+    EXPECT_FALSE(second_ran.load());
+}
+
+TEST(BlockingExecutorTest, CancellationSkipsQueuedOperation)
+{
+    sylar::IOManager io;
+    sylar::BlockingExecutor blocking(1);
+    sylar::RequestContext context;
+    std::atomic<bool> second_ran{false};
+    bool cancelled = false;
+    io.schedule(
+        [&]
+        {
+            blocking.await(
+                io,
+                [] {
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(60)
+                    );
+                }
+            );
+        }
+    );
+    io.schedule(
+        [&]
+        {
+            try
+            {
+                blocking.await(
+                    io,
+                    context,
+                    [&] { second_ran.store(true); }
+                );
+            }
+            catch (const std::system_error& error)
+            {
+                cancelled = error.code().value() == ECANCELED;
+            }
+        }
+    );
+    io.addTimer(
+        std::chrono::milliseconds(10),
+        [&] { context.cancel(); }
+    );
+    io.run();
+    EXPECT_TRUE(cancelled);
+    EXPECT_FALSE(second_ran.load());
+}

@@ -9,6 +9,8 @@
 
 #include <openssl/err.h>
 
+#include "fiber/RequestContext.hpp"
+
 namespace sylar
 {
 namespace
@@ -187,12 +189,42 @@ TlsStream::~TlsStream()
     }
 }
 
+void TlsStream::checkRequestContext() const
+{
+    if (m_requestContext && (m_requestContext->cancelled() ||
+                             m_requestContext->expired()))
+    {
+        throw std::system_error(
+            m_requestContext->cancelled() ? ECANCELED : ETIMEDOUT,
+            std::generic_category(),
+            "TLS request"
+        );
+    }
+}
+
 void TlsStream::waitFor(IOManager::Event event)
 {
-    const auto
-        result = event == IOManager::Event::Read
-                     ? m_io.waitReadable(m_socket.fd(), m_timeout)
-                     : m_io.waitWritable(m_socket.fd(), m_timeout);
+    const auto result = event == IOManager::Event::Read
+                            ? (m_requestContext
+                                   ? m_io.waitReadable(
+                                         m_socket.fd(),
+                                         m_timeout,
+                                         *m_requestContext
+                                     )
+                                   : m_io.waitReadable(
+                                         m_socket.fd(),
+                                         m_timeout
+                                     ))
+                            : (m_requestContext
+                                   ? m_io.waitWritable(
+                                         m_socket.fd(),
+                                         m_timeout,
+                                         *m_requestContext
+                                     )
+                                   : m_io.waitWritable(
+                                         m_socket.fd(),
+                                         m_timeout
+                                     ));
     if (result == IOManager::WaitResult::TimedOut)
     {
         throw std::system_error(
@@ -247,6 +279,7 @@ void TlsStream::handshake()
     }
     for (;;)
     {
+        checkRequestContext();
         const int result = ::SSL_do_handshake(m_ssl);
         if (result == 1)
         {
@@ -269,6 +302,7 @@ std::size_t TlsStream::readSome(std::span<std::byte> buffer)
     handshake();
     for (;;)
     {
+        checkRequestContext();
         std::size_t count = 0;
         const int result = ::SSL_read_ex(
             m_ssl,
@@ -296,6 +330,7 @@ std::size_t TlsStream::writeSome(std::span<const std::byte> buffer)
     handshake();
     for (;;)
     {
+        checkRequestContext();
         std::size_t count = 0;
         const int result = ::SSL_write_ex(
             m_ssl,

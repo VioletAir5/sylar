@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <span>
 
 namespace sylar
 {
+
+class RequestContext;
 
 class Stream
 {
@@ -16,6 +19,10 @@ public:
 
     void readExact(std::span<std::byte> buffer);
     void writeAll(std::span<const std::byte> buffer);
+    void setRequestContext(std::shared_ptr<RequestContext> context);
+
+protected:
+    std::shared_ptr<RequestContext> m_requestContext;
 };
 
 } // namespace sylar

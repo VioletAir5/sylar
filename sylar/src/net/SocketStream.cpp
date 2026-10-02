@@ -5,6 +5,8 @@
 #include <system_error>
 #include <utility>
 
+#include "fiber/RequestContext.hpp"
+
 namespace sylar
 {
 namespace
@@ -53,6 +55,15 @@ std::size_t SocketStream::readSome(std::span<std::byte> buffer)
     }
     for (;;)
     {
+        if (m_requestContext && (m_requestContext->expired() ||
+                                 m_requestContext->cancelled()))
+        {
+            throw std::system_error(
+                m_requestContext->cancelled() ? ECANCELED : ETIMEDOUT,
+                std::generic_category(),
+                "socket read"
+            );
+        }
         const auto count = m_socket.recvSome(buffer);
         if (count >= 0)
         {
@@ -64,7 +75,15 @@ std::size_t SocketStream::readSome(std::span<std::byte> buffer)
         }
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
-            checkWait(m_io.waitReadable(m_socket.fd(), m_timeout));
+            checkWait(
+                m_requestContext
+                    ? m_io.waitReadable(
+                          m_socket.fd(),
+                          m_timeout,
+                          *m_requestContext
+                      )
+                    : m_io.waitReadable(m_socket.fd(), m_timeout)
+            );
             continue;
         }
         throw std::system_error(
@@ -83,6 +102,15 @@ std::size_t SocketStream::writeSome(std::span<const std::byte> buffer)
     }
     for (;;)
     {
+        if (m_requestContext && (m_requestContext->expired() ||
+                                 m_requestContext->cancelled()))
+        {
+            throw std::system_error(
+                m_requestContext->cancelled() ? ECANCELED : ETIMEDOUT,
+                std::generic_category(),
+                "socket write"
+            );
+        }
         const auto count = m_socket.sendSome(buffer);
         if (count >= 0)
         {
@@ -94,7 +122,15 @@ std::size_t SocketStream::writeSome(std::span<const std::byte> buffer)
         }
         if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
-            checkWait(m_io.waitWritable(m_socket.fd(), m_timeout));
+            checkWait(
+                m_requestContext
+                    ? m_io.waitWritable(
+                          m_socket.fd(),
+                          m_timeout,
+                          *m_requestContext
+                      )
+                    : m_io.waitWritable(m_socket.fd(), m_timeout)
+            );
             continue;
         }
         throw std::system_error(

@@ -16,6 +16,7 @@
 #include "net/SocketStream.hpp"
 #include "net/TlsStream.hpp"
 
+#include "fiber/RequestContext.hpp"
 #include "http/Http.hpp"
 #include "http/WebSocket.hpp"
 
@@ -108,6 +109,12 @@ TcpServer::Handler makeHandler(
             HttpRequest request;
             while (true)
             {
+                auto request_context = std::make_shared<
+                    RequestContext>(
+                    std::chrono::steady_clock::now() +
+                    std::chrono::seconds(30)
+                );
+                stream->setRequestContext(request_context);
                 try
                 {
                     if (!session.readRequest(request))
@@ -125,6 +132,7 @@ TcpServer::Handler makeHandler(
                     return;
                 }
 
+                request.context = request_context;
                 if (const auto handler = ws_routes->find(
                         request.target
                     ))
@@ -138,6 +146,7 @@ TcpServer::Handler makeHandler(
                         session.sendResponse(bad, false);
                         return;
                     }
+                    stream->setRequestContext({});
                     WebSocketSession websocket(
                         *stream,
                         request,

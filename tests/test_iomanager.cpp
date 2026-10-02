@@ -232,3 +232,41 @@ TEST(IOManagerTest, RejectsBlockingSocket)
 }
 
 } // namespace
+
+TEST(IOManagerTest, RequestContextDeadlineAndCancellation)
+{
+    int fds[2];
+    ASSERT_EQ(
+        ::socketpair(
+            AF_UNIX,
+            SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
+            0,
+            fds
+        ),
+        0
+    );
+    sylar::IOManager io;
+    auto deadline = sylar::RequestContext::withTimeout(
+        std::chrono::milliseconds(10)
+    );
+    sylar::RequestContext cancelled;
+    sylar::IOManager::WaitResult timeout_result{};
+    sylar::IOManager::WaitResult cancel_result{};
+    io.schedule(
+        [&]
+        {
+            timeout_result = io.waitReadable(fds[0], deadline);
+            cancel_result = io.waitReadable(fds[0], cancelled);
+        }
+    );
+    io.addTimer(
+        std::chrono::milliseconds(20),
+        [&] { cancelled.cancel(); }
+    );
+    io.run();
+    EXPECT_EQ(timeout_result, sylar::IOManager::WaitResult::TimedOut);
+    EXPECT_EQ(cancel_result, sylar::IOManager::WaitResult::Cancelled);
+    EXPECT_EQ(io.pendingEventCount(), 0);
+    ::close(fds[0]);
+    ::close(fds[1]);
+}

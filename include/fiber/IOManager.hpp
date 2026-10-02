@@ -9,9 +9,11 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stop_token>
 #include <thread>
 #include <unordered_map>
 
+#include "fiber/RequestContext.hpp"
 #include "fiber/Scheduler.hpp"
 #include "fiber/TimerManager.hpp"
 
@@ -68,6 +70,18 @@ public:
     waitReadable(int fd, std::chrono::milliseconds timeout);
     WaitResult
     waitWritable(int fd, std::chrono::milliseconds timeout);
+    WaitResult waitReadable(
+        int fd,
+        std::chrono::milliseconds timeout,
+        const RequestContext& context
+    );
+    WaitResult waitWritable(
+        int fd,
+        std::chrono::milliseconds timeout,
+        const RequestContext& context
+    );
+    WaitResult waitReadable(int fd, const RequestContext& context);
+    WaitResult waitWritable(int fd, const RequestContext& context);
 
     TimerManager::TimerId addTimer(
         std::chrono::milliseconds delay,
@@ -115,7 +129,14 @@ private:
     WaitResult wait(
         int fd,
         Event event,
-        std::optional<std::chrono::milliseconds> timeout
+        std::optional<std::chrono::milliseconds> timeout,
+        std::stop_token cancellation = {}
+    );
+    bool finishIfCurrent(
+        int fd,
+        Event event,
+        const std::shared_ptr<WaitState>& state,
+        WaitResult result
     );
     bool updateInterest(
         int fd, std::uint32_t old_mask, std::uint32_t new_mask

@@ -11,6 +11,7 @@
 #include "net/TcpServer.hpp"
 
 #include "fiber/IOManager.hpp"
+#include "fiber/RequestContext.hpp"
 #include "http/HttpClient.hpp"
 #include "http/HttpServer.hpp"
 #include "http/Servlet.hpp"
@@ -56,11 +57,15 @@ TEST(HttpServerTest, HandlesTwoRequestsOnOneConnection)
 {
     sylar::IOManager io;
     auto routes = std::make_shared<sylar::ServletDispatch>();
+    bool context_seen = false;
     routes->addExact(
         "/hello",
         std::make_shared<sylar::FunctionServlet>(
-            [](const sylar::HttpRequest&)
+            [&](const sylar::HttpRequest& request)
             {
+                context_seen = request.context &&
+                               request.context->deadline().has_value(
+                               );
                 sylar::HttpResponse response;
                 response.body = "hello";
                 return response;
@@ -104,6 +109,7 @@ TEST(HttpServerTest, HandlesTwoRequestsOnOneConnection)
         }
     );
     io.run();
+    EXPECT_TRUE(context_seen);
     EXPECT_NE(wire.find("HTTP/1.1 200 OK"), std::string::npos);
     EXPECT_NE(wire.find("hello"), std::string::npos);
     EXPECT_NE(wire.find("HTTP/1.1 404 Not Found"), std::string::npos);

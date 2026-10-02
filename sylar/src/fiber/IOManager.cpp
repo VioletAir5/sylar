@@ -5,6 +5,7 @@
 #include <sys/eventfd.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <chrono>
@@ -249,7 +250,8 @@ void IOManager::registerWait(
 IOManager::WaitResult IOManager::wait(
     int fd,
     Event event,
-    std::optional<std::chrono::milliseconds> timeout
+    std::optional<std::chrono::milliseconds> timeout,
+    std::stop_token cancellation
 )
 {
     if (timeout && timeout->count() < 0)
@@ -257,9 +259,13 @@ IOManager::WaitResult IOManager::wait(
         throw std::invalid_argument("negative I/O timeout");
     }
 
-    if (m_stopRequested.load())
+    if (m_stopRequested.load() || cancellation.stop_requested())
     {
         return WaitResult::Cancelled;
+    }
+    if (timeout && *timeout == std::chrono::milliseconds::zero())
+    {
+        return WaitResult::TimedOut;
     }
     auto state = std::make_shared<WaitState>();
     registerWait(fd, event, state);
@@ -270,16 +276,13 @@ IOManager::WaitResult IOManager::wait(
         {
             timer_id = m_timers.addAfter(
                 *timeout,
-                [this, fd, event, state]
-                {
-                    if (!state->result)
-                    {
-                        finish(
-                            fd,
-                            eventMask(event),
-                            WaitResult::TimedOut
-                        );
-                    }
+                [this, fd, event, state] {
+                    finishIfCurrent(
+                        fd,
+                        event,
+                        state,
+                        WaitResult::TimedOut
+                    );
                 }
             );
         }
@@ -289,7 +292,49 @@ IOManager::WaitResult IOManager::wait(
             throw;
         }
     }
+    std::optional<std::stop_callback<std::function<void()>>>
+        stop_callback;
+    try
+    {
+        if (cancellation.stop_possible())
+        {
+            stop_callback.emplace(
+                cancellation,
+                [this, fd, event, state]
+                {
+                    try
+                    {
+                        post(
+                            [this, fd, event, state] {
+                                finishIfCurrent(
+                                    fd,
+                                    event,
+                                    state,
+                                    WaitResult::Cancelled
+                                );
+                            }
+                        );
+                    }
+                    catch (const std::exception&)
+                    {
+                        // Shutdown cancels remaining waits; a failed
+                        // wakeup must not escape a stop callback.
+                    }
+                }
+            );
+        }
+    }
+    catch (...)
+    {
+        if (timer_id != 0)
+        {
+            m_timers.cancel(timer_id);
+        }
+        cancel(fd, event);
+        throw;
+    }
     Fiber::YieldToHold();
+    stop_callback.reset();
     if (timer_id != 0)
     {
         m_timers.cancel(timer_id);
@@ -304,6 +349,27 @@ IOManager::WaitResult IOManager::wait(
         );
     }
     return *state->result;
+}
+
+bool IOManager::finishIfCurrent(
+    int fd,
+    Event event,
+    const std::shared_ptr<WaitState>& state,
+    WaitResult result
+)
+{
+    const auto found = m_waiters.find(fd);
+    if (found == m_waiters.end())
+    {
+        return false;
+    }
+    const auto& slot = event == Event::Read ? found->second.read
+                                            : found->second.write;
+    if (slot.state != state)
+    {
+        return false;
+    }
+    return finish(fd, eventMask(event), result);
 }
 
 IOManager::WaitResult IOManager::waitReadable(int fd)
@@ -326,6 +392,54 @@ IOManager::WaitResult
 IOManager::waitWritable(int fd, std::chrono::milliseconds timeout)
 {
     return wait(fd, Event::Write, timeout);
+}
+
+IOManager::WaitResult IOManager::waitReadable(
+    int fd,
+    std::chrono::milliseconds timeout,
+    const RequestContext& context
+)
+{
+    if (const auto remaining = context.remaining())
+    {
+        timeout = std::min(timeout, *remaining);
+    }
+    return wait(fd, Event::Read, timeout, context.token());
+}
+
+IOManager::WaitResult IOManager::waitWritable(
+    int fd,
+    std::chrono::milliseconds timeout,
+    const RequestContext& context
+)
+{
+    if (const auto remaining = context.remaining())
+    {
+        timeout = std::min(timeout, *remaining);
+    }
+    return wait(fd, Event::Write, timeout, context.token());
+}
+
+IOManager::WaitResult
+IOManager::waitReadable(int fd, const RequestContext& context)
+{
+    return wait(
+        fd,
+        Event::Read,
+        context.remaining(),
+        context.token()
+    );
+}
+
+IOManager::WaitResult
+IOManager::waitWritable(int fd, const RequestContext& context)
+{
+    return wait(
+        fd,
+        Event::Write,
+        context.remaining(),
+        context.token()
+    );
 }
 
 TimerManager::TimerId IOManager::addTimer(

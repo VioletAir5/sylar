@@ -1,9 +1,16 @@
 #include "net/Stream.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 namespace sylar
 {
+
+void Stream::setRequestContext(std::shared_ptr<RequestContext> context
+)
+{
+    m_requestContext = std::move(context);
+}
 
 void Stream::readExact(std::span<std::byte> buffer)
 {

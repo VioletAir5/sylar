@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,8 @@
 namespace sylar
 {
 
+class RequestContext;
+
 struct HttpRequest
 {
     std::string method;
@@ -18,6 +21,7 @@ struct HttpRequest
     std::string version;
     std::unordered_map<std::string, std::string> headers;
     std::string body;
+    std::shared_ptr<RequestContext> context;
 
     std::optional<std::string_view> header(std::string_view name
     ) const;

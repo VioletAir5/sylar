@@ -70,6 +70,7 @@ public:
 private:
     int handleRetry(int result);
     void waitFor(IOManager::Event event);
+    void checkRequestContext() const;
 
     IOManager& m_io;
     Socket m_socket;
