@@ -54,7 +54,7 @@ file(GLOB SYLAR_APPS CONFIGURE_DEPENDS
 )
 foreach(app_source IN LISTS SYLAR_APPS)
     get_filename_component(app_name "${app_source}" NAME_WE)
-    if((app_name STREQUAL "redis_demo" AND NOT SYLAR_WITH_REDIS) OR
+    if(((app_name STREQUAL "redis_demo" OR app_name STREQUAL "redis_ws_server") AND NOT SYLAR_WITH_REDIS) OR
        (app_name STREQUAL "mysql_demo" AND NOT SYLAR_WITH_MYSQL) OR
        (app_name STREQUAL "zk_demo" AND NOT SYLAR_WITH_ZOOKEEPER))
         continue()

@@ -110,6 +110,13 @@ if(SYLAR_WITH_REDIS AND REDIS_SERVER_EXECUTABLE)
             $<TARGET_FILE:redis_demo>
     )
     set_tests_properties(RedisApp.TypedRepliesAndShutdown PROPERTIES TIMEOUT 20)
+    add_test(
+        NAME RedisCluster.BroadcastReplayAndGap
+        COMMAND Python3::Interpreter
+            "${CMAKE_CURRENT_SOURCE_DIR}/test_redis_stream_cluster.py"
+            $<TARGET_FILE:redis_ws_server>
+    )
+    set_tests_properties(RedisCluster.BroadcastReplayAndGap PROPERTIES TIMEOUT 25)
 endif()
 
 find_program(MYSQLD_EXECUTABLE mysqld)
