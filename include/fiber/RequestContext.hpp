@@ -17,10 +17,12 @@ public:
     explicit RequestContext(
         std::optional<std::chrono::steady_clock::time_point>
             deadline = std::nullopt,
-        std::string request_id = {}
+        std::string request_id = {},
+        std::string trace_parent = {}
     )
         : m_deadline(deadline)
         , m_requestId(std::move(request_id))
+        , m_traceParent(std::move(trace_parent))
     {
     }
 
@@ -62,6 +64,15 @@ public:
                std::chrono::steady_clock::now() >= *m_deadline;
     }
 
+    const std::string& traceParent() const noexcept
+    {
+        return m_traceParent;
+    }
+    void setTraceParent(std::string value)
+    {
+        m_traceParent = std::move(value);
+    }
+
     std::stop_token token() const noexcept
     {
         return m_stop.get_token();
@@ -86,6 +97,7 @@ private:
     std::optional<std::chrono::steady_clock::time_point> m_deadline;
     std::stop_source m_stop;
     std::string m_requestId;
+    std::string m_traceParent;
 };
 
 } // namespace sylar

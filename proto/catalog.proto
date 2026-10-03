@@ -17,4 +17,6 @@ message ProductReply {
   uint64 price_cents = 3;
   string instance_id = 4;
   string request_id = 5;
+  string trace_parent = 6;
+  uint64 server_elapsed_us = 7;
 }

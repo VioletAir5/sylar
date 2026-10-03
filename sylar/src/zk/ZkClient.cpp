@@ -135,6 +135,32 @@ ZkClient ZkClient::connect(
     return ZkClient(std::move(impl));
 }
 
+bool ZkClient::ownsEphemeral(const std::string& path)
+{
+    checkPath(path);
+    Stat stat{};
+    const auto
+        result = ::zoo_exists(m_impl->handle, path.c_str(), 0, &stat);
+    if (result == ZNONODE)
+        return false;
+    checkResult(result, "zoo_exists");
+    auto* session = ::zoo_client_id(m_impl->handle);
+    return session && stat.ephemeralOwner == session->client_id;
+}
+bool ZkClient::connected() const noexcept
+{
+    if (!m_impl)
+        return false;
+    std::lock_guard lock(m_impl->session.mutex);
+    return m_impl->session.connected && !m_impl->session.terminal;
+}
+bool ZkClient::expired() const noexcept
+{
+    if (!m_impl)
+        return true;
+    std::lock_guard lock(m_impl->session.mutex);
+    return m_impl->session.terminal;
+}
 void ZkClient::create(
     const std::string& path, std::string_view value, bool ephemeral
 )

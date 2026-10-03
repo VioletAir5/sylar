@@ -167,3 +167,11 @@ if(SYLAR_WITH_GRPC)
             $<TARGET_FILE:catalog_server> $<TARGET_FILE:rpc_gateway>)
     set_tests_properties(GrpcCluster.GatewayAndFailures PROPERTIES TIMEOUT 30)
 endif()
+
+if(SYLAR_WITH_GRPC AND SYLAR_WITH_ZOOKEEPER AND JAVA_EXECUTABLE AND
+   EXISTS "/usr/share/zookeeper/bin/zkServer.sh")
+    add_test(NAME GrpcDiscovery.MembershipAndSessionRecovery
+        COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/test_grpc_discovery.py"
+            $<TARGET_FILE:catalog_server> $<TARGET_FILE:rpc_gateway>)
+    set_tests_properties(GrpcDiscovery.MembershipAndSessionRecovery PROPERTIES TIMEOUT 60)
+endif()

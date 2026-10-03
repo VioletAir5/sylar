@@ -68,15 +68,23 @@ try:
     b, b_port = start(catalog_binary, 0, "catalog-b", 0)
     gateway, port = start(gateway_binary, 0, f"127.0.0.1:{a_port},127.0.0.1:{b_port}")
     instances = set()
+    trace = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
     for _ in range(4):
-        code, headers, body = request(port, headers={"X-Request-Id": "demo-123"})
+        code, headers, body = request(port, headers={"X-Request-Id": "demo-123", "traceparent": trace})
         assert code == 200, body
         value = json.loads(body)
         assert value["request_id"] == "demo-123"
         assert value["price_cents"] == 19900
         assert headers["X-Request-Id"] == "demo-123"
         instances.add(value["instance_id"])
+        assert value["trace_parent"].split("-")[1] == trace.split("-")[1]
+        assert headers["traceparent"].split("-")[1] == trace.split("-")[1]
+        assert value["server_elapsed_us"] >= 0
     assert instances == {"catalog-a", "catalog-b"}
+    spans = json.loads(request(port, "/traces")[2])["spans"]
+    by_id = {span["span_id"]: span for span in spans}
+    assert any(span["kind"] == "rpc.client" and span["parent_span_id"] in by_id for span in spans)
+    assert request(port, headers={"traceparent": "invalid"})[0] == 400
     assert request(port, "/products/9")[0] == 404
     assert request(port, "/products/bad")[0] == 400
     assert request(port, headers={"X-Request-Timeout-Ms": "99999"})[0] == 400
@@ -84,12 +92,14 @@ try:
     a.kill()
     a.wait()
     codes = [request(port)[0] for _ in range(6)]
-    assert 503 in codes and 200 in codes, codes
+    assert codes == [200] * 6, codes
+    assert any(item["open"] for item in json.loads(request(port, "/endpoints")[2])["endpoints"])
     assert request(port, "/health")[0] == 200
     a, _ = start(catalog_binary, a_port, "catalog-a", 0)
     def recovered():
         codes = [request(port)[0] for _ in range(2)]
-        return codes == [200, 200]
+        view = json.loads(request(port, "/endpoints")[2])["endpoints"]
+        return codes == [200, 200] and not any(item["open"] for item in view)
     eventually(recovered)
     stop(gateway)
     stop(a)
@@ -121,6 +131,23 @@ try:
         assert active.result(timeout=3)[0] == 200
     stop(slow)
     print("PASS deadlines, capacity, health isolation, recovery and active drain")
+    slow, slow_port = start(catalog_binary, 0, "isolated-slow", 300)
+    fast, fast_port = start(catalog_binary, 0, "isolated-fast", 0)
+    gateway, port = start(gateway_binary, 0, f"127.0.0.1:{slow_port}",
+        env={"SYLAR_RPC_SECONDARY_ENDPOINTS": f"127.0.0.1:{fast_port}",
+             "SYLAR_RPC_MAX_INFLIGHT": "2", "SYLAR_RPC_TIMEOUT_MS": "1000"})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        active = executor.submit(request, port)
+        eventually(lambda: stats(port)["sylar_rpc_inflight"] == 1)
+        assert request(port)[0] == 503
+        assert request(port, "/secondary/products/1")[0] == 200
+        assert request(port, "/health")[0] == 200
+        assert active.result(timeout=3)[0] == 200
+    stop(gateway)
+    stop(slow)
+    stop(fast)
+    print("PASS named downstream isolation and distributed trace context")
+
 finally:
     for child in reversed(children):
         if child.poll() is None:

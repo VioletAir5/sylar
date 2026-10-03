@@ -5,6 +5,7 @@
 #include <charconv>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -15,6 +16,9 @@
 #include "os/SignalFd.hpp"
 
 #include "rpc/CatalogService.hpp"
+#ifdef SYLAR_RPC_WITH_ZOOKEEPER
+#include "rpc/ZkDiscovery.hpp"
+#endif
 
 namespace
 {
@@ -53,7 +57,18 @@ int main(int argc, char** argv)
             argc > 3 ? number(argv[3], 5000) : 0
         );
         sylar::SignalFd signals;
-        sylar::rpc::CatalogService catalog(instance, delay);
+        const auto trace_capacity =
+            std::getenv("SYLAR_TRACE_CAPACITY")
+                ? number(std::getenv("SYLAR_TRACE_CAPACITY"), 65536)
+                : 4096;
+        auto recorder = trace_capacity
+                            ? std::make_shared<
+                                  sylar::rpc::TraceRecorder>(
+                                  trace_capacity
+                              )
+                            : nullptr;
+        sylar::rpc::CatalogService
+            catalog(instance, delay, 32, recorder);
         grpc::EnableDefaultHealthCheckService(true);
         grpc::ServerBuilder builder;
         grpc::ResourceQuota quota;
@@ -82,6 +97,30 @@ int main(int argc, char** argv)
         std::cout << "catalog_server listening on port "
                   << actual_port << " instance=" << instance
                   << std::endl;
+#ifdef SYLAR_RPC_WITH_ZOOKEEPER
+        std::unique_ptr<sylar::rpc::ZkDiscovery> registration;
+        if (auto hosts = std::getenv("SYLAR_ZK_HOSTS"))
+        {
+            const auto root = std::getenv("SYLAR_ZK_PATH")
+                                  ? std::getenv("SYLAR_ZK_PATH")
+                                  : "/sylar/services/catalog";
+            const auto host = std::getenv("SYLAR_ADVERTISE_HOST")
+                                  ? std::getenv("SYLAR_ADVERTISE_HOST"
+                                    )
+                                  : "127.0.0.1";
+            registration = sylar::rpc::ZkDiscovery::advertise(
+                hosts,
+                root,
+                instance,
+                std::string(host) + ":" + std::to_string(actual_port)
+            );
+        }
+#else
+        if (std::getenv("SYLAR_ZK_HOSTS"))
+            throw std::runtime_error(
+                "rebuild with SYLAR_WITH_ZOOKEEPER"
+            );
+#endif
         pollfd descriptor{signals.get(), POLLIN, 0};
         for (;;)
         {
@@ -106,6 +145,14 @@ int main(int argc, char** argv)
             std::chrono::system_clock::now() + std::chrono::seconds(2)
         );
         server->Wait();
+        if (auto file = std::getenv("SYLAR_TRACE_FILE"))
+        {
+            std::ofstream output(file);
+            if (!output)
+                throw std::runtime_error("cannot open trace output");
+            output
+                << (recorder ? recorder->json() : "{\"spans\":[]}");
+        }
         std::cout << "catalog_server stopped" << std::endl;
     }
     catch (const std::exception& error)

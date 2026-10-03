@@ -8,6 +8,7 @@
 
 #include "catalog.grpc.pb.h"
 #include "http/RequestLimiter.hpp"
+#include "rpc/Trace.hpp"
 
 namespace sylar::rpc
 {
@@ -22,7 +23,8 @@ public:
         std::string instance_id,
         std::chrono::milliseconds delay = std::chrono::milliseconds(0
         ),
-        std::uint32_t concurrency = 32
+        std::uint32_t concurrency = 32,
+        std::shared_ptr<TraceRecorder> recorder = {}
     );
     grpc::Status GetProduct(
         grpc::ServerContext* context,
@@ -33,6 +35,7 @@ public:
     std::uint64_t cancelledCalls() const noexcept;
 
 private:
+    std::shared_ptr<TraceRecorder> m_recorder;
     std::string m_instanceId;
     std::chrono::milliseconds m_delay;
     RequestLimiter m_limiter;

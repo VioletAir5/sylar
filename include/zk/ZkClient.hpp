@@ -28,6 +28,9 @@ public:
         std::string_view value,
         bool ephemeral = false
     );
+    bool ownsEphemeral(const std::string& path);
+    bool connected() const noexcept;
+    bool expired() const noexcept;
     bool exists(const std::string& path);
     std::string get(const std::string& path);
     void

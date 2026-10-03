@@ -32,6 +32,8 @@ target_link_libraries(sylar_rpc_contract PUBLIC protobuf::libprotobuf PkgConfig:
 
 add_library(sylar_grpc STATIC
     ../src/rpc/GrpcRuntime.cpp
+    ../src/rpc/Trace.cpp
+    ../src/rpc/EndpointDirectory.cpp
     ../src/rpc/CatalogClient.cpp
     ../src/rpc/CatalogService.cpp
 )
@@ -39,3 +41,8 @@ target_link_libraries(sylar_grpc PUBLIC sylar_core sylar_rpc_contract Threads::T
 target_compile_options(sylar_grpc PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
 )
+
+if(SYLAR_WITH_ZOOKEEPER)
+    target_sources(sylar_grpc PRIVATE ../src/rpc/ZkDiscovery.cpp)
+    target_compile_definitions(sylar_grpc PUBLIC SYLAR_RPC_WITH_ZOOKEEPER=1)
+endif()

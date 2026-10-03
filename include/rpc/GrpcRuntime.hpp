@@ -11,12 +11,14 @@
 #include <stop_token>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/support/async_unary_call.h>
 
 #include "fiber/IOManager.hpp"
 #include "fiber/RequestContext.hpp"
+#include "rpc/Trace.hpp"
 
 namespace sylar::rpc
 {
@@ -33,6 +35,11 @@ template <class Reply> struct UnaryResult
 class GrpcRuntime
 {
 public:
+    enum class NotificationMode
+    {
+        WorkerQueue,
+        PerCallEventfd
+    };
     struct Snapshot
     {
         std::size_t in_flight;
@@ -48,7 +55,9 @@ public:
     explicit GrpcRuntime(
         std::size_t max_in_flight = 64,
         std::chrono::milliseconds max_timeout = std::chrono::seconds(2
-        )
+        ),
+        NotificationMode mode = NotificationMode::WorkerQueue,
+        std::shared_ptr<TraceRecorder> recorder = {}
     );
     ~GrpcRuntime();
     GrpcRuntime(const GrpcRuntime&) = delete;
@@ -62,7 +71,8 @@ public:
         IOManager& io,
         const RequestContext& request_context,
         Request request,
-        Prepare&& prepare
+        Prepare&& prepare,
+        const std::string& downstream = "default"
     )
     {
         if (IOManager::GetThis() != &io)
@@ -103,9 +113,19 @@ public:
                 {}};
         }
 
+        std::optional<TraceScope> span;
+        if (m_recorder || !request_context.traceParent().empty())
+            span.emplace(
+                m_recorder,
+                request_context.traceParent(),
+                downstream,
+                "rpc.client"
+            );
         auto call = std::make_shared<UnaryCall<Request, Reply>>(
             std::move(request)
         );
+        call->downstream = downstream;
+        call->prepareNotification(io, m_mode);
         call->context.set_deadline(
             std::chrono::system_clock::now() + timeout
         );
@@ -116,6 +136,8 @@ public:
                 request_context.requestId()
             );
         }
+        if (span)
+            call->context.AddMetadata("traceparent", span->header());
         grpc::Status admission = start(
             call,
             [&](grpc::CompletionQueue* queue, void* tag)
@@ -137,6 +159,9 @@ public:
         );
         if (!admission.ok())
         {
+            if (span)
+                span->finish(static_cast<int>(admission.error_code())
+                );
             return {std::move(admission), {}};
         }
         std::stop_callback cancel(
@@ -146,11 +171,16 @@ public:
         IOManager::WaitResult outcome;
         try
         {
-            outcome = io.waitReadable(
-                call->fd,
-                timeout,
-                request_context
-            );
+            outcome = call->completion ? io.waitCompletion(
+                                             *call->completion,
+                                             timeout,
+                                             request_context
+                                         )
+                                       : io.waitReadable(
+                                             call->fd,
+                                             timeout,
+                                             request_context
+                                         );
         }
         catch (...)
         {
@@ -160,6 +190,12 @@ public:
         if (outcome != IOManager::WaitResult::Ready)
         {
             call->context.TryCancel();
+            if (span)
+                span->finish(static_cast<int>(
+                    outcome == IOManager::WaitResult::TimedOut
+                        ? grpc::StatusCode::DEADLINE_EXCEEDED
+                        : grpc::StatusCode::CANCELLED
+                ));
             return {
                 grpc::Status(
                     outcome == IOManager::WaitResult::TimedOut
@@ -175,10 +211,29 @@ public:
             throw std::logic_error("gRPC signalled before completion"
             );
         }
+        if (span)
+            span->finish(
+                static_cast<int>(call->status.error_code()),
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() -
+                    call->completedAt
+                )
+                    .count()
+            );
         return {call->status, std::move(call->reply)};
     }
 
     Snapshot snapshot() const;
+    struct DownstreamSnapshot
+    {
+        std::string name;
+        std::size_t limit, in_flight;
+        std::uint64_t rejected;
+    };
+    void configureDownstream(
+        const std::string& name, std::size_t capacity
+    );
+    std::vector<DownstreamSnapshot> downstreamSnapshot() const;
     // Reject new calls, cancel active RPCs, drain CQ tags, then join.
     // Callers must stop using this object before destruction.
     void shutdown();
@@ -192,7 +247,12 @@ private:
         grpc::ClientContext context;
         grpc::Status status;
         std::atomic_bool done{false};
-        int fd;
+        std::chrono::steady_clock::time_point completedAt;
+        std::string downstream;
+        int fd = -1;
+        std::optional<IOManager::Completion> completion;
+        void
+        prepareNotification(IOManager& io, NotificationMode mode);
         void notify() noexcept;
     };
 
@@ -216,6 +276,8 @@ private:
             initiate
     );
 
+    std::shared_ptr<TraceRecorder> m_recorder;
+    NotificationMode m_mode;
     std::chrono::milliseconds m_maxTimeout;
     std::unique_ptr<Impl> m_impl;
 };
