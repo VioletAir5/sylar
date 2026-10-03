@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <yaml-cpp/yaml.h>
 
 #include "fiber/IOManagerPool.hpp"
 #include "rpc/CatalogClient.hpp"
@@ -744,3 +745,46 @@ TEST(GrpcTest, ReservedCapacityCannotBeConsumedByGenericCalls)
 }
 
 } // namespace
+
+TEST(GrpcTest, TraceSnapshotsSurviveConcurrentEviction)
+{
+    sylar::rpc::TraceRecorder recorder(8);
+    std::atomic_bool go{false};
+    std::jthread publisher(
+        [&]
+        {
+            while (!go.load())
+                std::this_thread::yield();
+            for (unsigned i = 0; i < 1000; ++i)
+            {
+                sylar::rpc::SpanRecord span;
+                span.trace_id = "0123456789abcdef0123456789abcdef";
+                span.span_id = "0123456789abcdef";
+                span.name = "generation-" + std::to_string(i);
+                span.duration_us = i;
+                recorder.record(std::move(span));
+            }
+        }
+    );
+    go.store(true);
+    for (unsigned i = 0; i < 50; ++i)
+    {
+        const auto snapshot = YAML::Load(recorder.json());
+        ASSERT_LE(snapshot["spans"].size(), 8);
+        for (const auto& span : snapshot["spans"])
+        {
+            EXPECT_EQ(
+                span["trace_id"].as<std::string>(),
+                "0123456789abcdef0123456789abcdef"
+            );
+            EXPECT_EQ(
+                span["name"].as<std::string>(),
+                "generation-" +
+                    std::to_string(span["duration_us"].as<unsigned>())
+            );
+        }
+    }
+    publisher.join();
+    EXPECT_EQ(recorder.size(), 8);
+    EXPECT_EQ(recorder.dropped(), 992);
+}

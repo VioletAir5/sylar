@@ -71,6 +71,20 @@ int main(int argc, char** argv)
             catalog(instance, delay, 32, recorder);
         grpc::EnableDefaultHealthCheckService(true);
         grpc::ServerBuilder builder;
+        if (const auto* value = std::getenv("SYLAR_GRPC_MAX_POLLERS"))
+        {
+            const auto max_pollers = number(value, 32);
+            if (max_pollers == 0)
+                throw std::invalid_argument(
+                    "invalid gRPC poller limit"
+                );
+            // Opt-in experiment; default gRPC retention remains 2.
+            // MAX_POLLERS is not the total thread resource limit.
+            builder.SetSyncServerOption(
+                grpc::ServerBuilder::MAX_POLLERS,
+                static_cast<int>(max_pollers)
+            );
+        }
         grpc::ResourceQuota quota;
         quota.SetMaxThreads(64);
         builder.SetResourceQuota(quota);

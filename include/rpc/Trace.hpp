@@ -38,7 +38,7 @@ public:
 private:
     std::size_t m_capacity;
     mutable std::mutex m_mutex;
-    std::deque<SpanRecord> m_spans;
+    std::deque<std::shared_ptr<const SpanRecord>> m_spans;
     std::uint64_t m_dropped = 0;
 };
 class TraceScope

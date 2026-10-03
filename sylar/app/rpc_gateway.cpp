@@ -17,6 +17,7 @@
 
 #include "os/SignalFd.hpp"
 
+#include "fiber/BlockingExecutor.hpp"
 #include "fiber/IOManagerPool.hpp"
 #include "http/HttpServer.hpp"
 #include "rpc/CatalogClient.hpp"
@@ -25,6 +26,12 @@
 #endif
 namespace
 {
+struct TraceExportLease
+{
+    std::shared_ptr<sylar::RequestLimiter> owner;
+    std::optional<sylar::RequestLimiter::Permit> permit;
+};
+
 unsigned
 number(std::string_view text, unsigned maximum, bool zero = false)
 {
@@ -151,6 +158,15 @@ int main(int argc, char** argv)
                                            trace_capacity
                                        )
                                      : nullptr;
+        auto trace_executor = tracer ? std::make_unique<
+                                           sylar::BlockingExecutor>(1)
+                                     : nullptr;
+        auto export_limiter = std::make_shared<sylar::RequestLimiter>(
+            sylar::RequestLimiter::Options{
+                .initial = 2,
+                .minimum = 2,
+                .maximum = 2}
+        );
         sylar::rpc::GrpcRuntime runtime(
             limit,
             std::chrono::seconds(2),
@@ -364,14 +380,73 @@ int main(int argc, char** argv)
         dispatch->addExact(
             "/traces",
             std::make_shared<sylar::FunctionServlet>(
-                [tracer](const auto&)
+                [tracer,
+                 executor = trace_executor.get(),
+                 export_limiter](const sylar::HttpRequest& request)
                 {
                     sylar::HttpResponse response;
                     response
                         .headers["Content-Type"] = "application/json";
-                    response.body =
-                        tracer ? tracer->json()
-                               : "{\"dropped\":0,\"spans\":[]}\n";
+                    if (!tracer)
+                    {
+                        response
+                            .body = "{\"dropped\":0,\"spans\":[]}\n";
+                        return response;
+                    }
+                    auto permit = export_limiter->tryAcquire();
+                    if (!permit)
+                    {
+                        response.status = 503;
+                        response.reason = reason(503);
+                        response.body =
+                            "{\"error\":\"trace export busy\"}\n";
+                        return response;
+                    }
+                    auto lease = std::make_shared<TraceExportLease>(
+                        TraceExportLease{
+                            export_limiter,
+                            std::move(permit)}
+                    );
+                    auto deadline = std::chrono::steady_clock::now() +
+                                    std::chrono::milliseconds(500);
+                    if (request.context &&
+                        request.context->deadline())
+                        deadline = std::min(
+                            deadline,
+                            *request.context->deadline()
+                        );
+                    sylar::RequestContext context(deadline);
+                    std::stop_callback cancel(
+                        request.context ? request.context->token()
+                                        : std::stop_token{},
+                        [&] { context.cancel(); }
+                    );
+                    try
+                    {
+                        response.body = executor->await(
+                            *sylar::IOManager::GetThis(),
+                            context,
+                            [tracer, lease]
+                            {
+                                auto json = tracer->json();
+                                // Release capacity when work actually
+                                // finishes, including when its caller
+                                // already timed out.
+                                lease->permit.reset();
+                                return json;
+                            }
+                        );
+                    }
+                    catch (const std::system_error& error)
+                    {
+                        response.status = error.code().value() ==
+                                                  ETIMEDOUT
+                                              ? 504
+                                              : 503;
+                        response.reason = reason(response.status);
+                        response.body = "{\"error\":\"trace export "
+                                        "wait ended\"}\n";
+                    }
                     return response;
                 }
             )
@@ -556,6 +631,9 @@ int main(int argc, char** argv)
         acceptor.runForever();
         server->stop();
         workers.stop();
+        // No route can enqueue now; finish owned exports before
+        // teardown.
+        trace_executor.reset();
 #ifdef SYLAR_RPC_WITH_ZOOKEEPER
         discovery.reset();
 #endif

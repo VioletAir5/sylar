@@ -29,6 +29,10 @@ target_compile_options(sylar_http_bench PRIVATE
 )
 
 if(SYLAR_WITH_GRPC)
+    add_executable(sylar_trace_export_bench bench_trace_export.cpp)
+    target_link_libraries(sylar_trace_export_bench PRIVATE sylar_grpc)
+    add_executable(sylar_trace_bench bench_trace.cpp)
+    target_link_libraries(sylar_trace_bench PRIVATE sylar_grpc)
     add_executable(sylar_rpc_bench bench_rpc.cpp)
     target_link_libraries(sylar_rpc_bench PRIVATE sylar_grpc Threads::Threads)
     target_compile_options(sylar_rpc_bench PRIVATE
@@ -36,6 +40,9 @@ if(SYLAR_WITH_GRPC)
 endif()
 
 if(SYLAR_WITH_GRPC AND BUILD_TESTING)
+    add_test(NAME GrpcTrace.AllocationBudget
+        COMMAND sylar_trace_bench 10000 1)
+    set_tests_properties(GrpcTrace.AllocationBudget PROPERTIES TIMEOUT 10)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME GrpcBenchmark.Smoke
         COMMAND Python3::Interpreter "${PROJECT_SOURCE_DIR}/bench/run_rpc_benchmark.py"

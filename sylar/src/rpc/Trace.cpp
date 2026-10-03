@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <stdexcept>
+#include <vector>
 
 #include <fmt/format.h>
 #include <openssl/rand.h>
@@ -86,7 +87,19 @@ TraceContext TraceContext::child() const
 }
 std::string TraceContext::header() const
 {
-    return "00-" + trace_id + "-" + span_id + "-" + flags;
+    // Wire size is known before encoding (55 bytes for v00).
+    // One reservation avoids growth of intermediate concatenations.
+    std::string result;
+    result.reserve(
+        5 + trace_id.size() + span_id.size() + flags.size()
+    );
+    result.append("00-");
+    result.append(trace_id);
+    result.push_back('-');
+    result.append(span_id);
+    result.push_back('-');
+    result.append(flags);
+    return result;
 }
 bool TraceContext::sampled() const
 {
@@ -102,6 +115,10 @@ TraceRecorder::TraceRecorder(std::size_t capacity)
 }
 void TraceRecorder::record(SpanRecord record)
 {
+    auto entry = m_capacity ? std::make_shared<const SpanRecord>(
+                                  std::move(record)
+                              )
+                            : nullptr;
     std::lock_guard lock(m_mutex);
     if (m_capacity == 0)
     {
@@ -113,7 +130,7 @@ void TraceRecorder::record(SpanRecord record)
         ++m_dropped;
         m_spans.pop_front();
     }
-    m_spans.push_back(std::move(record));
+    m_spans.push_back(std::move(entry));
 }
 std::size_t TraceRecorder::size() const
 {
@@ -127,12 +144,21 @@ std::uint64_t TraceRecorder::dropped() const
 }
 std::string TraceRecorder::json() const
 {
-    std::lock_guard lock(m_mutex);
-    std::string result = "{\"dropped\":" + std::to_string(m_dropped) +
+    // Pin immutable records under the mutex, then encode outside it.
+    // Eviction cannot invalidate an export already in progress.
+    std::vector<std::shared_ptr<const SpanRecord>> snapshot;
+    std::uint64_t dropped;
+    {
+        std::lock_guard lock(m_mutex);
+        snapshot.assign(m_spans.begin(), m_spans.end());
+        dropped = m_dropped;
+    }
+    std::string result = "{\"dropped\":" + std::to_string(dropped) +
                          ",\"spans\":[";
     bool first = true;
-    for (auto& span : m_spans)
+    for (const auto& entry : snapshot)
     {
+        const auto& span = *entry;
         if (!first)
             result += ',';
         first = false;

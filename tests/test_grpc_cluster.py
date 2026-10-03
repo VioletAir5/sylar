@@ -64,8 +64,15 @@ def eventually(predicate, timeout=6):
     raise AssertionError("condition did not become true")
 
 try:
+    for value in ("0", "33", "invalid"):
+        invalid = subprocess.run(
+            [catalog_binary, "0", "invalid-config"],
+            capture_output=True, text=True, timeout=3,
+            env={**os.environ, "SYLAR_GRPC_MAX_POLLERS": value})
+        assert invalid.returncode != 0, value
     a, a_port = start(catalog_binary, 0, "catalog-a", 0)
-    b, b_port = start(catalog_binary, 0, "catalog-b", 0)
+    b, b_port = start(catalog_binary, 0, "catalog-b", 0,
+        env={"SYLAR_GRPC_MAX_POLLERS": "8"})
     gateway, port = start(gateway_binary, 0, f"127.0.0.1:{a_port},127.0.0.1:{b_port}")
     instances = set()
     trace = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
