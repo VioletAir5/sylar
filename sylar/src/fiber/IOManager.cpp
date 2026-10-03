@@ -43,8 +43,145 @@ private:
 
 } // namespace
 
+struct IOManager::Lifetime
+{
+    std::mutex mutex;
+    IOManager* owner = nullptr;
+};
+struct IOManager::Completion::State
+{
+    std::shared_ptr<Lifetime> lifetime;
+    std::atomic_bool notified{false};
+    std::uint64_t fiber = 0;
+    std::optional<WaitResult> result;
+};
+void IOManager::Completion::notify() const noexcept
+{
+    if (m_state->notified.exchange(true, std::memory_order_acq_rel))
+        return;
+    std::lock_guard lock(m_state->lifetime->mutex);
+    auto* owner = m_state->lifetime->owner;
+    if (!owner)
+        return;
+    try
+    {
+        owner->postCompletion(m_state, WaitResult::Ready);
+    }
+    catch (...)
+    { /* Stop cancels owner-side waits. */
+    }
+}
+IOManager::Completion IOManager::makeCompletion()
+{
+    requireOwnerThread();
+    auto state = std::make_shared<Completion::State>();
+    state->lifetime = m_lifetime;
+    return Completion(std::move(state));
+}
+
+void IOManager::postCompletion(
+    std::shared_ptr<Completion::State> state, WaitResult result
+)
+{
+    bool wake;
+    {
+        std::lock_guard lock(m_postMutex);
+        if (m_stopRequested.load())
+            return;
+        wake = m_posts.empty() && m_completionPosts.empty();
+        m_completionPosts.emplace_back(std::move(state), result);
+        if (m_diagnosticsEnabled)
+        {
+            m_postCount.fetch_add(1, std::memory_order_relaxed);
+            m_postQueue.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
+    if (wake)
+        signalWakeup();
+}
+void IOManager::finishCompletion(
+    std::shared_ptr<Completion::State> state, WaitResult result
+)
+{
+    if (m_completions.erase(state.get()) == 0)
+        return;
+    --m_pendingEvents;
+    state->result = result;
+    m_scheduler.wake(state->fiber);
+}
+IOManager::WaitResult IOManager::waitCompletion(
+    const Completion& completion,
+    std::chrono::milliseconds timeout,
+    const RequestContext& context
+)
+{
+    requireOwnerThread();
+    auto state = completion.m_state;
+    auto* fiber = Fiber::GetCurrent();
+    if (state->lifetime != m_lifetime || !fiber ||
+        fiber->getId() == 0 || Scheduler::GetThis() != &m_scheduler)
+        throw std::logic_error(
+            "completion wait requires its owner Fiber"
+        );
+    if (state->fiber != 0)
+        throw std::logic_error("completion can only be awaited once");
+    if (m_stopRequested.load() || context.cancelled())
+        return WaitResult::Cancelled;
+    if (auto remaining = context.remaining())
+        timeout = std::min(timeout, *remaining);
+    if (timeout.count() <= 0)
+        return WaitResult::TimedOut;
+    if (state->notified.load(std::memory_order_acquire))
+        return WaitResult::Ready;
+    state->fiber = fiber->getId();
+    m_completions.emplace(state.get(), state);
+    ++m_pendingEvents;
+    TimerManager::TimerId timer = 0;
+    try
+    {
+        timer = addTimer(
+            timeout,
+            [this, state]
+            { finishCompletion(state, WaitResult::TimedOut); }
+        );
+        std::stop_callback cancel(
+            context.token(),
+            [state]
+            {
+                std::lock_guard lock(state->lifetime->mutex);
+                auto* owner = state->lifetime->owner;
+                if (!owner)
+                    return;
+                try
+                {
+                    owner->postCompletion(
+                        state,
+                        WaitResult::Cancelled
+                    );
+                }
+                catch (...)
+                {
+                }
+            }
+        );
+        Fiber::YieldToHold();
+    }
+    catch (...)
+    {
+        if (timer)
+            cancelTimer(timer);
+        finishCompletion(state, WaitResult::Cancelled);
+        throw;
+    }
+    cancelTimer(timer);
+    if (!state->result)
+        throw std::logic_error("completion resumed without result");
+    return *state->result;
+}
+
 IOManager::IOManager()
-    : m_ownerThread(std::this_thread::get_id())
+    : m_lifetime(std::make_shared<Lifetime>())
+    , m_ownerThread(std::this_thread::get_id())
     , m_diagnosticsEnabled(
           []
           {
@@ -73,6 +210,7 @@ IOManager::IOManager()
             "eventfd"
         );
     }
+    m_lifetime->owner = this;
     epoll_event wakeup{};
     wakeup.events = EPOLLIN;
     wakeup.data.fd = m_wakeupFd;
@@ -92,6 +230,10 @@ IOManager::IOManager()
 
 IOManager::~IOManager()
 {
+    {
+        std::lock_guard lock(m_lifetime->mutex);
+        m_lifetime->owner = nullptr;
+    }
     if (m_wakeupFd >= 0)
     {
         ::close(m_wakeupFd);
@@ -642,12 +784,14 @@ void IOManager::post(std::function<void()> callback)
     {
         throw std::invalid_argument("empty posted task");
     }
+    bool wake = false;
     {
         std::lock_guard lock(m_postMutex);
         if (m_stopRequested.load())
         {
             throw std::logic_error("IOManager is stopping");
         }
+        wake = m_posts.empty() && m_completionPosts.empty();
         m_posts.push_back(std::move(callback));
         if (m_diagnosticsEnabled)
         {
@@ -655,7 +799,8 @@ void IOManager::post(std::function<void()> callback)
             m_postQueue.fetch_add(1, std::memory_order_relaxed);
         }
     }
-    signalWakeup();
+    if (wake)
+        signalWakeup();
 }
 
 void IOManager::requestStop()
@@ -670,17 +815,21 @@ void IOManager::requestStop()
 void IOManager::drainPosts()
 {
     std::deque<std::function<void()>> pending;
+    decltype(m_completionPosts) completions;
     {
         std::lock_guard lock(m_postMutex);
         pending.swap(m_posts);
+        completions.swap(m_completionPosts);
         if (m_diagnosticsEnabled)
         {
             m_postQueue.fetch_sub(
-                pending.size(),
+                pending.size() + completions.size(),
                 std::memory_order_relaxed
             );
         }
     }
+    for (auto& [state, result] : completions)
+        finishCompletion(std::move(state), result);
     for (auto& callback : pending)
     {
         m_scheduler.schedule(std::move(callback));
@@ -689,6 +838,11 @@ void IOManager::drainPosts()
 
 void IOManager::cancelAllWaits()
 {
+    while (!m_completions.empty())
+        finishCompletion(
+            m_completions.begin()->second,
+            WaitResult::Cancelled
+        );
     std::vector<int> fds;
     fds.reserve(m_waiters.size());
     for (const auto& [fd, context] : m_waiters)

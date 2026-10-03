@@ -24,6 +24,21 @@ namespace sylar
 class IOManager
 {
 public:
+    class Completion
+    {
+    public:
+        void notify() const noexcept;
+
+    private:
+        friend class IOManager;
+        struct State;
+        explicit Completion(std::shared_ptr<State> state)
+            : m_state(std::move(state))
+        {
+        }
+        std::shared_ptr<State> m_state;
+    };
+    Completion makeCompletion();
     struct Diagnostics
     {
         bool enabled = false;
@@ -49,6 +64,12 @@ public:
         Cancelled,
         TimedOut
     };
+
+    WaitResult waitCompletion(
+        const Completion& completion,
+        std::chrono::milliseconds timeout,
+        const RequestContext& context
+    );
 
     IOManager();
     ~IOManager();
@@ -101,6 +122,22 @@ public:
     static IOManager* GetThis() noexcept;
 
 private:
+    struct Lifetime;
+    void postCompletion(
+        std::shared_ptr<Completion::State> state, WaitResult result
+    );
+    std::deque<
+        std::pair<std::shared_ptr<Completion::State>, WaitResult>>
+        m_completionPosts;
+    void finishCompletion(
+        std::shared_ptr<Completion::State> state, WaitResult result
+    );
+    std::shared_ptr<Lifetime> m_lifetime;
+    std::unordered_map<
+        Completion::State*,
+        std::shared_ptr<Completion::State>>
+        m_completions;
+
     struct WaitState
     {
         std::optional<WaitResult> result;
