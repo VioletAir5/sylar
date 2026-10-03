@@ -27,3 +27,19 @@ add_executable(sylar_http_bench bench_http.cpp)
 target_compile_options(sylar_http_bench PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
 )
+
+if(SYLAR_WITH_GRPC)
+    add_executable(sylar_rpc_bench bench_rpc.cpp)
+    target_link_libraries(sylar_rpc_bench PRIVATE sylar_grpc Threads::Threads)
+    target_compile_options(sylar_rpc_bench PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>)
+endif()
+
+if(SYLAR_WITH_GRPC AND BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME GrpcBenchmark.Smoke
+        COMMAND Python3::Interpreter "${PROJECT_SOURCE_DIR}/bench/run_rpc_benchmark.py"
+            --build "${CMAKE_BINARY_DIR}" --requests 200 --concurrency 4 --rounds 1
+            --output "${CMAKE_BINARY_DIR}/rpc_smoke.json")
+    set_tests_properties(GrpcBenchmark.Smoke PROPERTIES TIMEOUT 30)
+endif()
