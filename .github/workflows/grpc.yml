@@ -1,4 +1,4 @@
-name: gRPC microservice tests
+name: gRPC governance and discovery tests
 on:
   push:
   pull_request:
@@ -8,6 +8,9 @@ jobs:
   grpc:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      matrix:
+        zookeeper: ["OFF", "ON"]
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -17,8 +20,14 @@ jobs:
             cmake g++ pkg-config libboost-context-dev libfmt-dev libyaml-cpp-dev \
             libssl-dev libsqlite3-dev libgtest-dev openssl python3 \
             libgrpc++-dev libprotobuf-dev protobuf-compiler protobuf-compiler-grpc
+          if [ "${{ matrix.zookeeper }}" = "ON" ]; then
+            sudo apt-get install -y --no-install-recommends libzookeeper-mt-dev zookeeperd default-jre-headless
+          fi
       - name: Configure
-        run: cmake -S . -B build-grpc -DCMAKE_BUILD_TYPE=Release -DSYLAR_WITH_GRPC=ON
+        run: >-
+          cmake -S . -B build-grpc -DCMAKE_BUILD_TYPE=Release
+          -DSYLAR_WITH_GRPC=ON -DSYLAR_BUILD_BENCHMARKS=ON
+          -DSYLAR_WITH_ZOOKEEPER=${{ matrix.zookeeper }}
       - name: Build
         run: cmake --build build-grpc --parallel 2
       - name: Test

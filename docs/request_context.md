@@ -36,3 +36,8 @@ routes->addExact("/item", std::make_shared<sylar::FunctionServlet>(
 ## 验证
 
 `tests/test_iomanager.cpp` 覆盖 Deadline、显式取消和 epoll 登记清理；`tests/test_stream.cpp` 覆盖请求总 Deadline 限制 socket 读取；`tests/test_blocking_executor.cpp` 覆盖到期/取消的排队函数不执行；`tests/test_http_server.cpp` 验证 Servlet 能得到请求上下文。完整 Release 回归按 README 的 CTest 命令运行。
+
+
+## RPC 追踪上下文
+
+`RequestContext` 可携带可选 `trace_parent`（构造函数第三个参数，或 `setTraceParent` / `traceParent`）。RPC 重试传播同一请求的取消与 deadline，每次尝试生成新的 client span；HTTP 网关校验 version 00 traceparent。上下文仅携带字符串，协议校验与记录属于 RPC 模块，核心不依赖 gRPC。详细边界见 [追踪说明](rpc_governance.md)。

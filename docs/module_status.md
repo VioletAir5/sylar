@@ -30,6 +30,8 @@ HTTP 示例现可无状态多副本运行；Kubernetes 清单提供三副本 Dep
 
 ## gRPC 微服务扩展
 
-gRPC 为本项目新增扩展，使用 `SYLAR_WITH_GRPC=ON` 开启，默认核心不依赖 gRPC。已有 versioned Protobuf 契约、独立 Catalog 服务、HTTP 网关、共享 channel、静态副本轮询和 CQ 到 Fiber 的完成适配。请求携带 deadline、协作取消和 request ID，在途调用有固定限额。10 项真实后端测试加 1 项进程故障测试已通过；所有扩展开启的 Release 回归为 144/144。
+通过 `SYLAR_WITH_GRPC=ON` 开启，默认核心不依赖 gRPC。已有 versioned Protobuf 契约、独立 Catalog 服务、HTTP 网关、共享 channel 和 worker Completion 适配。请求携带 deadline、协作取消、request ID 与 traceparent；在途调用占用总容量与下游保留容量直到 CQ 完成。
 
-服务端示例使用 gRPC 同步 handler 线程；网关异步等待使用本框架 Fiber。尚无动态注册发现、故障摘除、应用层重试、服务认证或 RPC 吞吐量基准。Compose 已提供但未在本机验收。架构和启动见 [gRPC 教程](grpc.md)。
+已实现端点原子更新、UNAVAILABLE 摘除、后台限时探测恢复、共享预算的只读重试、ZooKeeper 临时注册与周期发现、有界最近 span JSON，以及直接 RPC / 网关双通知模式基准。17 项 gRPC C++ 测试、进程故障矩阵、真实 ZooKeeper 恢复和基准 smoke 已通过；2026-10-03 核心 133/133、仅 gRPC 151/151、所有扩展与基准 157/157。
+
+服务端仍为 gRPC 同步 handler。尚无流式 RPC、写请求幂等与去重、服务认证、mTLS、生产 ACL 和 OTLP exporter。Compose 与 CI 已配置但本机未运行 Docker、远端 CI 未确认。架构见 [gRPC 教程](grpc.md)，行为与配置见 [治理手册](rpc_governance.md)，性能结论见 [RPC 基准](rpc_benchmark.md)。
