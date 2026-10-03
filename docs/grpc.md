@@ -91,6 +91,6 @@ curl http://127.0.0.1:8080/traces
 
 静态双副本使用 [compose.rpc.yaml](../deploy/compose.rpc.yaml)，动态发现另叠加 [compose.rpc.discovery.yaml](../deploy/compose.rpc.discovery.yaml)。容器监听通过 `SYLAR_LISTEN_ADDRESS=0.0.0.0` 设置。启用动态发现需同时构建 ZooKeeper 模块，步骤和配置见 [治理手册](rpc_governance.md)。
 
-本机核心 133/133、仅 gRPC 151/151、所有扩展与基准 157/157。17 项 gRPC C++ 测试、进程故障矩阵、真实 ZooKeeper 会话恢复与基准 smoke 已通过；详细性能不是测试通过所保证的性质，见单独记录。
+本机核心 133/133、仅 gRPC 152/152、所有扩展与基准 159/159。18 项 gRPC C++ 测试、进程故障矩阵、真实 ZooKeeper 会话恢复与基准 smoke 已通过；详细性能不是测试通过所保证的性质，见单独记录。
 
 本机没有 Docker，镜像与 Compose 运行未验收；[CI](../.github/workflows/grpc.yml) 已配置 gRPC 及 ZooKeeper 开关矩阵，远端结果尚未确认。示例为明文 gRPC 和隔离演示网络，没有新增 mTLS、认证或生产 ACL；追踪为 JSON 诊断，不是 OTLP。连接与传输由 gRPC 管理，不能将项目描述为自行实现 HTTP/2 或 gRPC 协议栈。

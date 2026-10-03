@@ -1,0 +1,150 @@
+{
+  "baseline_commit": "bde76696aa74b25a423334f7b9d91f4c71a9420c",
+  "note": "same real header() implementation through separately linked binaries; allocation counting is a separate 10000-call pass, disabled in timed loops; no RAND_bytes or network in this microbenchmark",
+  "sha256": {
+    "before": "c57ce70b1f237332b9150fc3f68146b6841373b2a3b72ac921a117d974aad86f",
+    "after": "af9ef68a3f86c57bb498d9473023a67fc447a47fe8a49eb8ee3e483850374dd6"
+  },
+  "results": [
+    {
+      "iterations": 3000000,
+      "seconds": 0.130947675,
+      "ns_per_header": 43.64922500000001,
+      "headers_per_second": 22909914.208098765,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 1
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.065700336,
+      "ns_per_header": 21.900112,
+      "headers_per_second": 45661866.93474445,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 1
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.065094927,
+      "ns_per_header": 21.698309,
+      "headers_per_second": 46086540.66084136,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 2
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.1124576,
+      "ns_per_header": 37.485866666666666,
+      "headers_per_second": 26676720.826338105,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 2
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.105188497,
+      "ns_per_header": 35.06283233333333,
+      "headers_per_second": 28520228.785092346,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 3
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.057891778,
+      "ns_per_header": 19.297259333333333,
+      "headers_per_second": 51820830.23948582,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 3
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.05922569,
+      "ns_per_header": 19.741896666666666,
+      "headers_per_second": 50653694.36810277,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 4
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.105965868,
+      "ns_per_header": 35.321956,
+      "headers_per_second": 28311002.935398027,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 4
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.103953736,
+      "ns_per_header": 34.651245333333335,
+      "headers_per_second": 28858991.657596603,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 5
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.059917932,
+      "ns_per_header": 19.972644,
+      "headers_per_second": 50068483.671966515,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 5
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.0626408,
+      "ns_per_header": 20.880266666666667,
+      "headers_per_second": 47892108.65761612,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 6
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.103889372,
+      "ns_per_header": 34.629790666666665,
+      "headers_per_second": 28876871.062422056,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 6
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.143475565,
+      "ns_per_header": 47.82518833333334,
+      "headers_per_second": 20909483.785618827,
+      "allocations_per_header": 2,
+      "checksum": 310100000,
+      "variant": "before",
+      "round": 7
+    },
+    {
+      "iterations": 3000000,
+      "seconds": 0.057461763,
+      "ns_per_header": 19.153921,
+      "headers_per_second": 52208631.32932416,
+      "allocations_per_header": 1,
+      "checksum": 310100000,
+      "variant": "after",
+      "round": 7
+    }
+  ]
+}

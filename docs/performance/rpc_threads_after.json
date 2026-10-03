@@ -1,0 +1,26 @@
+{
+  "build": "/home/wzt/sylar/build-release",
+  "requests": 1000,
+  "concurrency": 4,
+  "thread_creations": 12,
+  "thread_creation_errors": 0,
+  "workload": {
+    "mode": "grpc-sync",
+    "requests": 1000,
+    "concurrency": 4,
+    "failed": 0,
+    "seconds": 1.410856012,
+    "rps": 708.789551516615,
+    "p50_us": 5775.725,
+    "p95_us": 7622.127,
+    "p99_us": 8743.242,
+    "client_cpu_seconds": 0.154152,
+    "client_peak_rss_kib": 17456,
+    "client_fd_baseline": 11,
+    "client_fd_peak": 11,
+    "epoll_ctl_including_warmup": 0,
+    "registrations_including_warmup": 0
+  },
+  "strace_summary": "% time     seconds  usecs/call     calls    errors syscall\n------ ----------- ----------- --------- --------- ----------------\n100.00    0.001771         147        12           clone3\n------ ----------- ----------- --------- --------- ----------------\n100.00    0.001771         147        12           total\n",
+  "note": "includes server startup/shutdown and 10 warmup requests per lane; ptrace perturbs scheduling; diagnostic timings are not benchmark evidence"
+}

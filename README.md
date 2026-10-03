@@ -28,7 +28,7 @@
 
 网关通过异步 gRPC 调用独立目录副本，默认使用 worker Completion 队列恢复原 Fiber。支持下游保留容量、端点摘除与后台恢复探测、共用 deadline 的只读重试、ZooKeeper 动态注册发现、traceparent 与有界跨进程 span。默认核心不引入 gRPC 依赖，加入 `-DSYLAR_WITH_GRPC=ON` 构建。
 
-入口：[架构与启动](docs/grpc.md)、[完整治理手册](docs/rpc_governance.md)、[性能方法与原始数据](docs/rpc_benchmark.md)、[七个面试工程问题](docs/interview/grpc.md)。2026-10-03 Release 验证：核心 **133/133**、仅加 gRPC **151/151**、全部扩展与基准 **157/157**。三轮同机基准中，worker 通知将直接 Fiber 峰值 fd 从 31 降到 15、网关从 50 降到 34，吞吐量差异较小。
+入口：[架构与启动](docs/grpc.md)、[完整治理手册](docs/rpc_governance.md)、[性能方法与原始数据](docs/rpc_benchmark.md)、[七个面试工程问题](docs/interview/grpc.md)。2026-10-03 Release 验证：核心 **133/133**、仅加 gRPC **152/152**、全部扩展与基准 **159/159**。三轮同机基准中，worker 通知将直接 Fiber 峰值 fd 从 31 降到 15、网关从 50 降到 34，吞吐量差异较小。
 
 提供 [静态双副本 Compose](deploy/compose.rpc.yaml) 与 [ZooKeeper 发现 overlay](deploy/compose.rpc.discovery.yaml)。本机已验证真实进程故障与 ZooKeeper 会话恢复，未运行 Docker；业务仍为只读 unary，追踪为 JSON 诊断导出。
 
@@ -53,12 +53,16 @@ ctest --test-dir build --output-on-failure
 ./build/sylar/sqlite_demo
 ```
 
-默认构建核心框架，不要求安装 Redis、MySQL 或 ZooKeeper 开发包。[核心 CI](.github/workflows/core.yml) 在推送和 PR 时运行同样的 Release 构建与测试。需要对应扩展时在配置阶段加入 `-DSYLAR_WITH_REDIS=ON`、`-DSYLAR_WITH_MYSQL=ON`、`-DSYLAR_WITH_ZOOKEEPER=ON`；三个开关可分别启用。2026-10-03 核心回归 133 项，核心加 gRPC 为 151 项；全部扩展和基准开启为 157 项。外部服务测试的注册还取决于本机服务程序及 Java 是否可用。若只构建示例而不运行测试，可加 `-DBUILD_TESTING=OFF`。
+默认构建核心框架，不要求安装 Redis、MySQL 或 ZooKeeper 开发包。[核心 CI](.github/workflows/core.yml) 在推送和 PR 时运行同样的 Release 构建与测试。需要对应扩展时在配置阶段加入 `-DSYLAR_WITH_REDIS=ON`、`-DSYLAR_WITH_MYSQL=ON`、`-DSYLAR_WITH_ZOOKEEPER=ON`；三个开关可分别启用。2026-10-03 核心回归 133 项，核心加 gRPC 为 152 项；全部扩展和基准开启为 159 项。外部服务测试的注册还取决于本机服务程序及 Java 是否可用。若只构建示例而不运行测试，可加 `-DBUILD_TESTING=OFF`。
 
 也可以用 `./build/sylar/echo_server 9000 4` 指定端口与 I/O 工作线程数。按 Ctrl+C 或发送 SIGTERM 停止服务。示例配置见 [conf/echo.yml](conf/echo.yml)。HTTP 示例提供 /、/health、/ready、/instance、/metrics 和 /echo，可用 `curl http://127.0.0.1:8080/health` 检查。HTTPS 可用 `http_server 8443 4 --tls cert.pem key.pem` 启动，客户端用 `http_client https://127.0.0.1:8443/health --ca cert.pem` 验证自签名证书；普通 CA 证书无需 `--ca`。
 
 ## 验证与性能
 
-全部扩展含 gRPC 与基准开启后的 Release 构建有 157 项测试通过，包含 Fiber、socketpair、定时器、TCP 回环、跨线程投递和应用停机。C++ epoll 压测工具与复现命令见 [TCP echo 基准](docs/echo_benchmark.md)，HTTP/1.1 的独立测量见 [HTTP 基准](docs/http_benchmark.md)，每 worker 的排队、epoll 与唤醒诊断见 [HTTP 工作线程诊断](docs/http_worker_diagnostics.md)。在同一台 WSL 主机、4 个并行压测进程、1000 个连接、每轮 10 万次 64 字节回显的测试中，4 工作线程版本约 **31 万请求/秒**（10 轮中位数）；单线程版本约 **4.2 万请求/秒**（3 轮中位数）。压测端和服务端同机运行，该数据不代表独立压测机上的极限性能。
+全部扩展含 gRPC 与基准开启后的 Release 构建有 159 项测试通过，包含 Fiber、socketpair、定时器、TCP 回环、跨线程投递和应用停机。C++ epoll 压测工具与复现命令见 [TCP echo 基准](docs/echo_benchmark.md)，HTTP/1.1 的独立测量见 [HTTP 基准](docs/http_benchmark.md)，每 worker 的排队、epoll 与唤醒诊断见 [HTTP 工作线程诊断](docs/http_worker_diagnostics.md)。在同一台 WSL 主机、4 个并行压测进程、1000 个连接、每轮 10 万次 64 字节回显的测试中，4 工作线程版本约 **31 万请求/秒**（10 轮中位数）；单线程版本约 **4.2 万请求/秒**（3 轮中位数）。压测端和服务端同机运行，该数据不代表独立压测机上的极限性能。
 
 六个特色方向与验收条件见[架构迭代路线](docs/next_architecture.md)，首版实现与局限可通过[面试材料](docs/interview/project_story.md)和对应功能文档核对。当前交付范围和已知限制见[开发计划](docs/roadmap.md)。原版 sylar 的完整模块对照与剩余工作见[模块状态](docs/module_status.md)。WebSocket 协议边界见[WebSocket 文档](docs/websocket.md)。其他外部服务集成仍在开发中；Hook 尚未覆盖全部 POSIX 调用。
+
+## 可观测性开销调优
+
+追踪导出采用不可变快照与独立有界执行器，保护业务 I/O 调度。并发16、持续抓取 /traces 的同机五轮实验中，吞吐量中位数 7326→7785 请求/秒，P99 6.99→4.45 ms；代价为一个线程及约1 MiB样本额外RSS。[完整实验](docs/performance/rpc_tuning.md)保留原始数据、失败方案和测量边界，[面试讲述](docs/interview/performance_tuning.md)解释定位与取舍。

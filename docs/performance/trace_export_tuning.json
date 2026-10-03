@@ -1,0 +1,140 @@
+{
+  "note": "microbenchmark: 4096 recent spans, one concurrent continuous exporter, 1000 producer records with 100us pacing; no RPC, no profiler; record latency includes snapshot mutex contention and record allocation",
+  "baseline_note": "before binary has header-only optimization but retains original export locking; after changes export snapshot ownership",
+  "sha256": {
+    "before": "e46cd684ab38d142930205d9b62101a9961f44c997b349af3d2b2fa1b488717c",
+    "after": "a3654a0a05f4ff69d5aa1c8c5387757faeb55e9a2362d20df8b08fac6e64b11d"
+  },
+  "results": [
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 939,
+      "record_p50_us": 1960.238,
+      "record_p95_us": 2756.994,
+      "record_p99_us": 3402.164,
+      "record_max_us": 5298.861,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "before",
+      "round": 1
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 80,
+      "record_p50_us": 0.38,
+      "record_p95_us": 1.444,
+      "record_p99_us": 38.109,
+      "record_max_us": 209.912,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "after",
+      "round": 1
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 77,
+      "record_p50_us": 0.38,
+      "record_p95_us": 1.455,
+      "record_p99_us": 48.845,
+      "record_max_us": 325.108,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "after",
+      "round": 2
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 945,
+      "record_p50_us": 1986.71,
+      "record_p95_us": 2791.497,
+      "record_p99_us": 3409.901,
+      "record_max_us": 5810.939,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "before",
+      "round": 2
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 940,
+      "record_p50_us": 1955.881,
+      "record_p95_us": 2700.965,
+      "record_p99_us": 3285.966,
+      "record_max_us": 4340.567,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "before",
+      "round": 3
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 78,
+      "record_p50_us": 0.358,
+      "record_p95_us": 1.335,
+      "record_p99_us": 6.795,
+      "record_max_us": 234.854,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "after",
+      "round": 3
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 74,
+      "record_p50_us": 0.391,
+      "record_p95_us": 1.346,
+      "record_p99_us": 41.822,
+      "record_max_us": 229.556,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "after",
+      "round": 4
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 934,
+      "record_p50_us": 1955.863,
+      "record_p95_us": 2679.724,
+      "record_p99_us": 3338.406,
+      "record_max_us": 4238.8,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "before",
+      "round": 4
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 933,
+      "record_p50_us": 1959.032,
+      "record_p95_us": 2655.746,
+      "record_p99_us": 3276.014,
+      "record_max_us": 4918.558,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "before",
+      "round": 5
+    },
+    {
+      "records": 1000,
+      "capacity": 4096,
+      "exports": 79,
+      "record_p50_us": 0.402,
+      "record_p95_us": 1.509,
+      "record_p99_us": 5.839,
+      "record_max_us": 220.512,
+      "retained": 4096,
+      "dropped": 1000,
+      "variant": "after",
+      "round": 5
+    }
+  ]
+}

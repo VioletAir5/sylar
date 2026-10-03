@@ -1,0 +1,1187 @@
+{
+  "recorded_at": "2026-10-03T21:56:21.530723+08:00",
+  "kernel": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "grpc": "1.30.2",
+  "protobuf": "libprotoc 3.12.4",
+  "builds": {
+    "before": {
+      "path": "/home/wzt/sylar/build-release/rpc-tuning/before",
+      "max_pollers": 2,
+      "sha256": {
+        "sylar/catalog_server": "1aca0ebfd8f8a49e929501a8bbefad6a9de1a4511ec0cf49df99dba1847dca7a",
+        "sylar/rpc_gateway": "3cfff4afad10fb4007155cd35e6e01c86ebc0925c77da4f7c15fb4a9f71c3a3d",
+        "bench/sylar_rpc_bench": "4dc9908e06a193be759069e5adc9dd7c7a3048fef807b7b8020edd7ab38cddb5"
+      }
+    },
+    "after": {
+      "path": "/home/wzt/sylar/build-release",
+      "max_pollers": 8,
+      "sha256": {
+        "sylar/catalog_server": "6218a53ad01c1fcfc4b384cc77dc71c904ecd583cc2f40465809ea41b2680c33",
+        "sylar/rpc_gateway": "3cfff4afad10fb4007155cd35e6e01c86ebc0925c77da4f7c15fb4a9f71c3a3d",
+        "bench/sylar_rpc_bench": "4dc9908e06a193be759069e5adc9dd7c7a3048fef807b7b8020edd7ab38cddb5"
+      }
+    }
+  },
+  "results": [
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.25302277,
+      "rps": 8876.963103217995,
+      "p50_us": 428.733,
+      "p95_us": 667.429,
+      "p99_us": 856.717,
+      "client_cpu_seconds": 0.697411,
+      "client_peak_rss_kib": 19900,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 1,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 2.45,
+          "peak_rss_kib": 12892,
+          "thread_baseline": 6,
+          "thread_peak": 10,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.99,
+          "peak_rss_kib": 12752,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.457182855,
+      "rps": 8139.402388919892,
+      "p50_us": 467.985,
+      "p95_us": 745.211,
+      "p99_us": 903.965,
+      "client_cpu_seconds": 0.7177239999999999,
+      "client_peak_rss_kib": 20028,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 1,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 3.19,
+          "peak_rss_kib": 12904,
+          "thread_baseline": 6,
+          "thread_peak": 13,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 3.0,
+          "peak_rss_kib": 12752,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.574399868,
+      "rps": 7768.800895541376,
+      "p50_us": 477.924,
+      "p95_us": 787.748,
+      "p99_us": 1059.734,
+      "client_cpu_seconds": 0.756591,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 2,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 3.32,
+          "peak_rss_kib": 13044,
+          "thread_baseline": 6,
+          "thread_peak": 14,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 3.12,
+          "peak_rss_kib": 12752,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.318681853,
+      "rps": 8625.590429374011,
+      "p50_us": 436.57,
+      "p95_us": 670.635,
+      "p99_us": 901.498,
+      "client_cpu_seconds": 0.7226520000000001,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 2,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 2.51,
+          "peak_rss_kib": 12848,
+          "thread_baseline": 6,
+          "thread_peak": 11,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 3.07,
+          "peak_rss_kib": 12680,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.696264123,
+      "rps": 7417.670928227531,
+      "p50_us": 472.301,
+      "p95_us": 815.698,
+      "p99_us": 1563.231,
+      "client_cpu_seconds": 0.877492,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 3,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 2.82,
+          "peak_rss_kib": 13012,
+          "thread_baseline": 6,
+          "thread_peak": 11,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 3.48,
+          "peak_rss_kib": 12728,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.362903126,
+      "rps": 8464.164180042648,
+      "p50_us": 450.67,
+      "p95_us": 710.152,
+      "p99_us": 867.19,
+      "client_cpu_seconds": 0.6775710000000001,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 3,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 3.09,
+          "peak_rss_kib": 12948,
+          "thread_baseline": 6,
+          "thread_peak": 13,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.88,
+          "peak_rss_kib": 12720,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.514030362,
+      "rps": 7955.3534047573285,
+      "p50_us": 478.37,
+      "p95_us": 763.879,
+      "p99_us": 938.352,
+      "client_cpu_seconds": 0.7405849999999999,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 4,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 3.26,
+          "peak_rss_kib": 12896,
+          "thread_baseline": 6,
+          "thread_peak": 13,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 3.07,
+          "peak_rss_kib": 12708,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.18544298,
+      "rps": 9151.462739146826,
+      "p50_us": 416.706,
+      "p95_us": 643.669,
+      "p99_us": 853.341,
+      "client_cpu_seconds": 0.666073,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 4,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 2.38,
+          "peak_rss_kib": 12948,
+          "thread_baseline": 6,
+          "thread_peak": 11,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.89,
+          "peak_rss_kib": 12740,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.205769448,
+      "rps": 9067.13075481858,
+      "p50_us": 419.897,
+      "p95_us": 648.759,
+      "p99_us": 879.564,
+      "client_cpu_seconds": 0.664584,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 5,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 2.39,
+          "peak_rss_kib": 12948,
+          "thread_baseline": 6,
+          "thread_peak": 11,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.9,
+          "peak_rss_kib": 12752,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 4,
+      "failed": 0,
+      "seconds": 2.442323135,
+      "rps": 8188.924599446993,
+      "p50_us": 460.558,
+      "p95_us": 768.852,
+      "p99_us": 969.525,
+      "client_cpu_seconds": 0.693506,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 8,
+      "client_fd_peak": 8,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 5,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 3.16,
+          "peak_rss_kib": 13056,
+          "thread_baseline": 6,
+          "thread_peak": 14,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.95,
+          "peak_rss_kib": 12716,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 22
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.045974639,
+      "rps": 9775.292234206427,
+      "p50_us": 1606.627,
+      "p95_us": 2132.908,
+      "p99_us": 2427.025,
+      "client_cpu_seconds": 0.565393,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 1,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.75,
+          "peak_rss_kib": 13324,
+          "thread_baseline": 6,
+          "thread_peak": 23,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.04,
+          "peak_rss_kib": 13392,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.148191177,
+      "rps": 9310.1583388544,
+      "p50_us": 1703.672,
+      "p95_us": 2277.888,
+      "p99_us": 2638.543,
+      "client_cpu_seconds": 0.5671900000000001,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 1,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.66,
+          "peak_rss_kib": 13352,
+          "thread_baseline": 6,
+          "thread_peak": 24,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.05,
+          "peak_rss_kib": 13404,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.090081824,
+      "rps": 9569.003361659778,
+      "p50_us": 1665.066,
+      "p95_us": 2184.377,
+      "p99_us": 2481.666,
+      "client_cpu_seconds": 0.537211,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 2,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.52,
+          "peak_rss_kib": 13664,
+          "thread_baseline": 6,
+          "thread_peak": 24,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 1.95,
+          "peak_rss_kib": 13392,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.145638848,
+      "rps": 9321.233169618674,
+      "p50_us": 1679.068,
+      "p95_us": 2242.59,
+      "p99_us": 2668.406,
+      "client_cpu_seconds": 0.613785,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 2,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.95,
+          "peak_rss_kib": 13504,
+          "thread_baseline": 6,
+          "thread_peak": 23,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.16,
+          "peak_rss_kib": 13424,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.128225314,
+      "rps": 9397.50122716565,
+      "p50_us": 1674.706,
+      "p95_us": 2207.225,
+      "p99_us": 2541.397,
+      "client_cpu_seconds": 0.605118,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 3,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.98,
+          "peak_rss_kib": 13268,
+          "thread_baseline": 6,
+          "thread_peak": 24,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.16,
+          "peak_rss_kib": 13408,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.227677916,
+      "rps": 8977.95855332257,
+      "p50_us": 1765.597,
+      "p95_us": 2371.875,
+      "p99_us": 2794.79,
+      "client_cpu_seconds": 0.619723,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 3,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.84,
+          "peak_rss_kib": 13576,
+          "thread_baseline": 6,
+          "thread_peak": 24,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.18,
+          "peak_rss_kib": 13352,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.159195831,
+      "rps": 9262.707769650191,
+      "p50_us": 1712.941,
+      "p95_us": 2274.751,
+      "p99_us": 2674.143,
+      "client_cpu_seconds": 0.577805,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 4,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.66,
+          "peak_rss_kib": 13416,
+          "thread_baseline": 6,
+          "thread_peak": 24,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.06,
+          "peak_rss_kib": 13368,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.069425952,
+      "rps": 9664.51589179645,
+      "p50_us": 1622.063,
+      "p95_us": 2152.423,
+      "p99_us": 2462.55,
+      "client_cpu_seconds": 0.5603819999999999,
+      "client_peak_rss_kib": 20540,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 4,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.8,
+          "peak_rss_kib": 13192,
+          "thread_baseline": 6,
+          "thread_peak": 23,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.07,
+          "peak_rss_kib": 13344,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.05955559,
+      "rps": 9710.832811266822,
+      "p50_us": 1619.394,
+      "p95_us": 2136.164,
+      "p99_us": 2426.71,
+      "client_cpu_seconds": 0.5567759999999999,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 5,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.77,
+          "peak_rss_kib": 13248,
+          "thread_baseline": 6,
+          "thread_peak": 24,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.04,
+          "peak_rss_kib": 13372,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 16,
+      "failed": 0,
+      "seconds": 2.179792475,
+      "rps": 9175.185357954775,
+      "p50_us": 1712.75,
+      "p95_us": 2347.582,
+      "p99_us": 2885.607,
+      "client_cpu_seconds": 0.592457,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 20,
+      "client_fd_peak": 20,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 5,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.72,
+          "peak_rss_kib": 13572,
+          "thread_baseline": 6,
+          "thread_peak": 25,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.1,
+          "peak_rss_kib": 13372,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 34
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.918670935,
+      "rps": 10423.882300588453,
+      "p50_us": 3026.969,
+      "p95_us": 3870.827,
+      "p99_us": 4405.247,
+      "client_cpu_seconds": 0.663298,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 1,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.37,
+          "peak_rss_kib": 13736,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.14,
+          "peak_rss_kib": 14020,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.035371397,
+      "rps": 9826.216497627238,
+      "p50_us": 3178.542,
+      "p95_us": 4235.334,
+      "p99_us": 5277.831,
+      "client_cpu_seconds": 0.7024379999999999,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 1,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.53,
+          "peak_rss_kib": 14104,
+          "thread_baseline": 6,
+          "thread_peak": 40,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.28,
+          "peak_rss_kib": 14104,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.992105025,
+      "rps": 10039.6313191369,
+      "p50_us": 3110.279,
+      "p95_us": 4200.895,
+      "p99_us": 4997.447,
+      "client_cpu_seconds": 0.695577,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 2,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.41,
+          "peak_rss_kib": 14152,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.21,
+          "peak_rss_kib": 14132,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.87134377,
+      "rps": 10687.507191690387,
+      "p50_us": 2947.086,
+      "p95_us": 3784.188,
+      "p99_us": 4289.411,
+      "client_cpu_seconds": 0.6467040000000001,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 2,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.29,
+          "peak_rss_kib": 13940,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.11,
+          "peak_rss_kib": 14256,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.939485666,
+      "rps": 10312.012277589063,
+      "p50_us": 3042.691,
+      "p95_us": 3997.255,
+      "p99_us": 4445.94,
+      "client_cpu_seconds": 0.6683330000000001,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 3,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.44,
+          "peak_rss_kib": 13784,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.12,
+          "peak_rss_kib": 14080,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.995474166,
+      "rps": 10022.680494075612,
+      "p50_us": 3141.8,
+      "p95_us": 4108.362,
+      "p99_us": 4708.515,
+      "client_cpu_seconds": 0.6954879999999999,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 3,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.44,
+          "peak_rss_kib": 13828,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.21,
+          "peak_rss_kib": 14152,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.021203493,
+      "rps": 9895.094714246074,
+      "p50_us": 3155.523,
+      "p95_us": 4257.65,
+      "p99_us": 5555.852,
+      "client_cpu_seconds": 0.707094,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 4,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.38,
+          "peak_rss_kib": 14188,
+          "thread_baseline": 6,
+          "thread_peak": 40,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.23,
+          "peak_rss_kib": 14352,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.035945882,
+      "rps": 9823.443823739122,
+      "p50_us": 3155.098,
+      "p95_us": 4319.382,
+      "p99_us": 5351.707,
+      "client_cpu_seconds": 0.725418,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 4,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.71,
+          "peak_rss_kib": 13944,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.28,
+          "peak_rss_kib": 14176,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.004572095,
+      "rps": 9977.191665935068,
+      "p50_us": 3146.091,
+      "p95_us": 4157.734,
+      "p99_us": 4732.613,
+      "client_cpu_seconds": 0.7061649999999999,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "before",
+      "case": "gateway-worker",
+      "round": 5,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.62,
+          "peak_rss_kib": 13824,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.28,
+          "peak_rss_kib": 14104,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.903408101,
+      "rps": 10507.468151203377,
+      "p50_us": 3015.652,
+      "p95_us": 3849.394,
+      "p99_us": 4321.974,
+      "client_cpu_seconds": 0.6383589999999999,
+      "client_peak_rss_kib": 20936,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "variant": "after",
+      "case": "gateway-worker",
+      "round": 5,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.17,
+          "peak_rss_kib": 13828,
+          "thread_baseline": 6,
+          "thread_peak": 39,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.04,
+          "peak_rss_kib": 14232,
+          "thread_baseline": 8,
+          "thread_peak": 9,
+          "fd_peak": 50
+        }
+      ]
+    }
+  ],
+  "note": "paired alternating before/after; same-host closed-loop; no profiling; trace/retries disabled; server CPU includes client startup/warmup; peaks sampled"
+}

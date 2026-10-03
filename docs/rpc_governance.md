@@ -148,10 +148,10 @@ Completion 可以先通知后等待，重复 notify 被忽略；定时器、取�
 | 构建 | 本机结果 | 条件 |
 | --- | --- | --- |
 | 核心 | 133/133 | 扩展关闭 |
-| 核心 + gRPC | 151/151 | ZooKeeper 关闭、基准关闭 |
-| 全部扩展 + gRPC + 基准 | 157/157 | Redis/MySQL/ZooKeeper 服务与 Java 可用 |
+| 核心 + gRPC | 152/152 | ZooKeeper 关闭、基准关闭 |
+| 全部扩展 + gRPC + 基准 | 159/159 | Redis/MySQL/ZooKeeper 服务与 Java 可用 |
 
-新增 4 项 Completion 测试、7 项治理 C++ 测试，gRPC C++ 共 17 项；进程故障矩阵覆盖两副本、摘除恢复、限额、超时、隔离和追踪；真实 ZooKeeper 测试验证会话与视图；基准另有小规模 smoke。
+新增 4 项 Completion 测试、7 项治理 C++ 测试，gRPC C++ 共 18 项；进程故障矩阵覆盖两副本、摘除恢复、限额、超时、隔离和追踪；真实 ZooKeeper 测试验证会话与视图；基准另有小规模 smoke。
 
 ```bash
 ctest --test-dir build-release \
@@ -160,3 +160,11 @@ ctest --test-dir build-release \
 ```
 
 本项目支持只读 unary 演示，没有写操作幂等与去重、流式 RPC、服务认证、mTLS、生产 ACL、跨机极限压测和正式可观测平台。Catalog 使用 gRPC 同步 handler，Fiber 异步适配在网关侧。新增线程包括每个 runtime 一个 CQ 线程、每个客户端一个探测线程，以及发现对象的刷新与过期线程；gRPC 自身也有内部线程。
+
+## 追踪导出性能迭代
+
+2026-10-03 调优增加不可变记录快照、锁外 JSON 编码及独立导出线程。网关最多两个执行/排队任务，满额 503；等待最多 500 ms，受父 deadline 和取消约束，超时 504。容量保留到实际完成/取消清理，停机先停止 I/O 使用者再结束执行器。追踪容量为 0 时不创建导出线程。
+
+SYLAR_GRPC_MAX_POLLERS 是后端实验参数（1..32）；未设置时沿用 gRPC 默认值，本机版本为 2。扩大保留量的方案未采用为默认，不能通过减少线程创建次数推导吞吐量收益。
+
+收益、内存与线程代价、失败方案及原始证据见[调优报告](performance/rpc_tuning.md)。最终回归 159/159，gRPC-only 152/152。

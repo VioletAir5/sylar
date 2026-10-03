@@ -42,3 +42,7 @@ flowchart LR
     Q --> I[IOManager: 原工作线程]
     I --> H
 ```
+
+## 追踪导出隔离
+
+TraceRecorder 在短临界区固定不可变 span 引用，在锁外编码 JSON。网关 /traces 经独立 BlockingExecutor 执行，不占用 I/O worker 做整批编码；独立准入最多两个任务，等待继承父预算并受500 ms上限约束。原RPC CQ与Fiber线程归属不变。实现、失败实验与资源代价见[调优报告](performance/rpc_tuning.md)。
