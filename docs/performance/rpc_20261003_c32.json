@@ -1,0 +1,488 @@
+{
+  "recorded_on": "2026-10-03",
+  "kernel": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "compiler": "c++ (Ubuntu 13.1.0-8ubuntu1~22.04) 13.1.0",
+  "grpc": "1.30.2",
+  "protobuf": "libprotoc 3.12.4",
+  "cpu_count": 16,
+  "note": "same-host loopback; closed-loop clients; 10 warmup calls per lane; tracing/retries disabled; server CPU includes warmup; fd peaks sampled",
+  "results": [
+    {
+      "mode": "grpc-sync",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.954375899,
+      "rps": 10233.445884301707,
+      "p50_us": 3047.033,
+      "p95_us": 4024.046,
+      "p99_us": 4749.689,
+      "client_cpu_seconds": 2.4082019999999997,
+      "client_peak_rss_kib": 17248,
+      "client_fd_baseline": 11,
+      "client_fd_peak": 11,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "grpc-sync",
+      "round": 1,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.42,
+          "peak_rss_kib": 15264,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "fiber-eventfd",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.134065189,
+      "rps": 9371.784940352165,
+      "p50_us": 3271.216,
+      "p95_us": 4711.435,
+      "p99_us": 6638.8,
+      "client_cpu_seconds": 2.206138,
+      "client_peak_rss_kib": 17504,
+      "client_fd_baseline": 15,
+      "client_fd_peak": 47,
+      "epoll_ctl_including_warmup": 40640,
+      "registrations_including_warmup": 20320,
+      "case": "fiber-eventfd",
+      "round": 1,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 7.12,
+          "peak_rss_kib": 13816,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "fiber-worker",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.084924624,
+      "rps": 9592.672929167726,
+      "p50_us": 3213.048,
+      "p95_us": 4583.995,
+      "p99_us": 5756.951,
+      "client_cpu_seconds": 1.9409669999999999,
+      "client_peak_rss_kib": 17504,
+      "client_fd_baseline": 15,
+      "client_fd_peak": 15,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "fiber-worker",
+      "round": 1,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.94,
+          "peak_rss_kib": 13952,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 2.173141595,
+      "rps": 9203.265928928115,
+      "p50_us": 3345.743,
+      "p95_us": 4849.981,
+      "p99_us": 5789.613,
+      "client_cpu_seconds": 0.7916719999999999,
+      "client_peak_rss_kib": 17504,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "gateway-eventfd",
+      "round": 1,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 7.02,
+          "peak_rss_kib": 14072,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.72,
+          "peak_rss_kib": 14152,
+          "fd_baseline": 15,
+          "fd_peak": 82
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.958488607,
+      "rps": 10211.956264905655,
+      "p50_us": 3055.726,
+      "p95_us": 4075.517,
+      "p99_us": 4685.452,
+      "client_cpu_seconds": 0.669512,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "gateway-worker",
+      "round": 1,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.54,
+          "peak_rss_kib": 13724,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.19,
+          "peak_rss_kib": 13960,
+          "fd_baseline": 15,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.88842881,
+      "rps": 10590.81491136539,
+      "p50_us": 2927.917,
+      "p95_us": 4010.555,
+      "p99_us": 4696.859,
+      "client_cpu_seconds": 0.636087,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "gateway-worker",
+      "round": 2,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.31,
+          "peak_rss_kib": 13904,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.06,
+          "peak_rss_kib": 14164,
+          "fd_baseline": 15,
+          "fd_peak": 50
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.940117057,
+      "rps": 10308.656340007634,
+      "p50_us": 3001.39,
+      "p95_us": 4156.545,
+      "p99_us": 4874.304,
+      "client_cpu_seconds": 0.6490159999999999,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "gateway-eventfd",
+      "round": 2,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.37,
+          "peak_rss_kib": 13876,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.37,
+          "peak_rss_kib": 14088,
+          "fd_baseline": 15,
+          "fd_peak": 82
+        }
+      ]
+    },
+    {
+      "mode": "fiber-worker",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.888001976,
+      "rps": 10593.20925202252,
+      "p50_us": 2950.765,
+      "p95_us": 3924.61,
+      "p99_us": 4545.356,
+      "client_cpu_seconds": 1.6091769999999999,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 15,
+      "client_fd_peak": 15,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "fiber-worker",
+      "round": 2,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.35,
+          "peak_rss_kib": 13992,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "fiber-eventfd",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.872565767,
+      "rps": 10680.53274948073,
+      "p50_us": 2921.741,
+      "p95_us": 3866.312,
+      "p99_us": 4452.279,
+      "client_cpu_seconds": 1.852209,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 15,
+      "client_fd_peak": 47,
+      "epoll_ctl_including_warmup": 40640,
+      "registrations_including_warmup": 20320,
+      "case": "fiber-eventfd",
+      "round": 2,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.34,
+          "peak_rss_kib": 13956,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "grpc-sync",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.763931937,
+      "rps": 11338.30596321926,
+      "p50_us": 2768.065,
+      "p95_us": 3552.747,
+      "p99_us": 4074.717,
+      "client_cpu_seconds": 2.0604790000000004,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 11,
+      "client_fd_peak": 11,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "grpc-sync",
+      "round": 2,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.86,
+          "peak_rss_kib": 14660,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "grpc-sync",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.795110936,
+      "rps": 11141.37271346889,
+      "p50_us": 2750.242,
+      "p95_us": 3905.332,
+      "p99_us": 5104.74,
+      "client_cpu_seconds": 2.07031,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 11,
+      "client_fd_peak": 11,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "grpc-sync",
+      "round": 3,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 5.92,
+          "peak_rss_kib": 14528,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "fiber-eventfd",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.887470302,
+      "rps": 10596.193210991247,
+      "p50_us": 2976.686,
+      "p95_us": 3783.039,
+      "p99_us": 4253.82,
+      "client_cpu_seconds": 1.852982,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 15,
+      "client_fd_peak": 48,
+      "epoll_ctl_including_warmup": 40640,
+      "registrations_including_warmup": 20320,
+      "case": "fiber-eventfd",
+      "round": 3,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.35,
+          "peak_rss_kib": 13732,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "fiber-worker",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.852238737,
+      "rps": 10797.74415710214,
+      "p50_us": 2902.302,
+      "p95_us": 3756.988,
+      "p99_us": 4199.374,
+      "client_cpu_seconds": 1.6207960000000001,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 15,
+      "client_fd_peak": 15,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "fiber-worker",
+      "round": 3,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.24,
+          "peak_rss_kib": 13904,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.994822698,
+      "rps": 10025.953695058668,
+      "p50_us": 3079.096,
+      "p95_us": 4304.92,
+      "p99_us": 5071.168,
+      "client_cpu_seconds": 0.673905,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "gateway-eventfd",
+      "round": 3,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.54,
+          "peak_rss_kib": 13840,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 2.4,
+          "peak_rss_kib": 14152,
+          "fd_baseline": 15,
+          "fd_peak": 82
+        }
+      ]
+    },
+    {
+      "mode": "http",
+      "requests": 20000,
+      "concurrency": 32,
+      "failed": 0,
+      "seconds": 1.848741037,
+      "rps": 10818.172799612064,
+      "p50_us": 2883.459,
+      "p95_us": 3857.465,
+      "p99_us": 4360.453,
+      "client_cpu_seconds": 0.606224,
+      "client_peak_rss_kib": 18016,
+      "client_fd_baseline": 36,
+      "client_fd_peak": 36,
+      "epoll_ctl_including_warmup": 0,
+      "registrations_including_warmup": 0,
+      "case": "gateway-worker",
+      "round": 3,
+      "delay_ms": 0,
+      "servers": [
+        {
+          "role": "catalog",
+          "cpu_seconds_including_client_warmup": 6.21,
+          "peak_rss_kib": 13828,
+          "fd_baseline": 9,
+          "fd_peak": 14
+        },
+        {
+          "role": "gateway",
+          "cpu_seconds_including_client_warmup": 1.99,
+          "peak_rss_kib": 14072,
+          "fd_baseline": 15,
+          "fd_peak": 50
+        }
+      ]
+    }
+  ]
+}
